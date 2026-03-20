@@ -1,5 +1,6 @@
 # MIRAGE: Benchmarking and Aligning Multi-Instance Image Editing
 [![arXiv](https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/xxxx.xxxxx)
+[![overview](jpg/mybench_qualitative.png)](jpg/mybench_qualitative.pdf)
 
 # 1. Requirements
 Install the required dependencies:
