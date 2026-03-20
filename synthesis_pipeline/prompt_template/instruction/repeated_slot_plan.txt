@@ -1,0 +1,50 @@
+You are given a source prompt describing an image scene with repeated instances of one object category.
+
+Your task is to extract a slot plan for later image-edit generation.
+
+Output exactly ONE SINGLE-LINE valid JSON object.
+No markdown. No extra text.
+
+GOAL
+- Identify the repeated object category and repeated-instance count N.
+- N MUST be one of: 3, 4, 5.
+- Build repeated_slots for the repeated instances in strict left-to-right order.
+- Also extract preferred_non_repeated_targets from the source prompt, if available.
+- preferred_non_repeated_targets are only PREFERRED candidates for later filler edits, not mandatory fixed targets.
+
+IMPORTANT NORMALIZATION
+- Normalize repeated_slots into stable canonical spatial phrasing so they can be reused verbatim later.
+- Use these preferred canonical patterns whenever they fit:
+  * N = 3: "the leftmost <category>", "the middle <category>", "the rightmost <category>"
+  * N = 4: "the leftmost <category>", "the second <category> from the left", "the second <category> from the right", "the rightmost <category>"
+  * N = 5: "the leftmost <category>", "the second <category> from the left", "the middle <category>", "the second <category> from the right", "the rightmost <category>"
+- Prefer these canonical phrases over alternative wording such as "left-center", "center-left", "near the middle", etc.
+
+RULES
+- The source prompt is authoritative.
+- repeated_slots MUST be mutually distinct.
+- repeated_slots MUST be listed in strict left-to-right order.
+- For each repeated slot, include a short repeated_details string summarizing visible cues from the source prompt.
+- preferred_non_repeated_targets should be standalone editable objects explicitly mentioned in the source prompt when possible.
+- Prefer non-repeated targets that can be identified independently by their own attributes or scene position.
+- Avoid using repeated instances as anchors for preferred_non_repeated_targets if an independent phrasing is available.
+- If N = 5, preferred_non_repeated_targets may be empty.
+- Do NOT invent objects or attributes not supported by the source prompt.
+
+OUTPUT FORMAT
+{"repeated_count":3,"repeated_category":"bicycle","repeated_slots":["the leftmost bicycle","the middle bicycle","the rightmost bicycle"],"repeated_details":["near the curb with a front basket","with a reflective frame","beside a bench"],"preferred_non_repeated_targets":["the red toolbox on the floor","the folded newspaper on the bench"]}
+
+Rules:
+- repeated_count must be 3, 4, or 5
+- repeated_category must be a singular noun phrase naming the repeated object category
+- len(repeated_slots) must equal repeated_count
+- len(repeated_details) must equal repeated_count
+- repeated_slots must all be unique
+- preferred_non_repeated_targets may contain 0, 1, or 2 items
+- preferred_non_repeated_targets must all be unique
+- use double quotes only
+- no trailing commas
+- output NOTHING else
+
+SOURCE_PROMPT:
+<<<{source_prompt}>>>

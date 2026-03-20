@@ -1,0 +1,87 @@
+You are judging, optimizing, and rewriting ONE repeated-subject image description draft for a text-to-image benchmark.
+
+Output only tagged lines. No JSON. No markdown. No explanations. No digits.
+
+Use exactly this tag style:
+DECISION: PASS or FIX or FAIL
+CATEGORY: <plural repeated category>
+SCENE: <realistic scene phrase>
+PROMPT: <one polished photographic paragraph>
+FEEDBACK: <short reason or short note>
+
+Fixed pair chosen before prose generation:
+{{FIXED_PAIR}}
+
+Fixed targets
+- count_word is {{COUNT_WORD}}
+- there are exactly {{COUNT_NUM}} repeated instances
+- the repeated instances must be ordered and described strictly from left to right only
+- preferred left-to-right position labels are: {{POSITION_LABELS}}
+
+Current candidate:
+{{CURRENT_CANDIDATE}}
+
+Opening checklist
+- The paragraph must not begin abruptly with the subject count.
+- The opening should feel like a photographic setup rather than a list.
+- The opening should vary naturally across samples rather than repeatedly using the same template stem.
+- If the current opening is too close to a repeated stem such as "A low-angle shot captures", rewrite it in a different natural way.
+- Before introducing the repeated subjects, include a brief but natural setup clause describing the photo, shot, lighting, or foreground composition.
+
+Recent opening stems to avoid repeating too often:
+{{RECENT_OPENINGS}}
+
+Mandatory explicit cues
+A correct final prompt must explicitly state all of the following:
+- the repeated instances are the main subjects
+- they are very close to the camera
+- they occupy most of the near foreground
+- they are fully visible
+- they are clearly separated with visible gaps
+- they do not touch, overlap, intersect, stack, or occlude one another
+- crisp foreground edges are visible
+- fine local textures on the repeated instances are clearly visible
+
+If any of these points is missing, weak, or only implied, output DECISION: FIX and rewrite the prompt so these properties become explicit and natural.
+
+Full checklist
+- Keep the fixed CATEGORY and SCENE unless the prose is impossible to repair without rephrasing them minimally.
+- The repeated instances must be clearly presented as the main subjects.
+- They must feel very close to the camera and clearly in the near foreground.
+- They should appear to occupy most of the foreground visual attention.
+- The prompt must explicitly convey clear gaps between repeated instances, and must make it clear they do not touch, overlap, intersect, stack, or occlude one another.
+- All repeated instances should remain fully visible.
+- Every repeated instance must receive its own unique local visual attribute.
+- Every repeated instance must be individually referable mainly by strict left-to-right spatial order and concrete local attributes.
+- Do not use front/back, near/far, nearest/farthest, rear/frontmost, foreground/background order, or other depth-based ordering for the repeated instances.
+- The prompt must explicitly reinforce that fine local textures on the repeated instances are clearly visible.
+- The prompt should explicitly convey crisp foreground edges when natural.
+- The prompt should, when natural, imply that the background is secondary and softly blurred, but it should not spend many words describing background content.
+- Do not force every repeated instance to be near or beside something.
+- The prompt must include exactly two extra editable foreground objects.
+- The two extra editable foreground objects must be two different individual objects, not the same object and not two instances of the same extra object category.
+- Identify them mainly through brief concrete appearance details such as material, color, texture, or surface marks rather than position wording.
+- They only need brief concrete detail, not long descriptions.
+- The two extra editable foreground objects should preferably be relatively small objects so that the repeated main subjects remain visually dominant and fully visible.
+- The two extra editable foreground objects must not be groups, piles, actions, large structures, benches, signs, floats, clusters, or other elements likely to block or compete with the repeated subjects.
+- The prose should sound natural and polished, not like a rigid template.
+- Avoid violating basic physical common sense.
+
+Fail conditions
+- some repeated instances are only implied but not individually described
+- fewer than all repeated instances receive unique local attributes
+- repeated instances are described as overlapping, touching, stacked, partially blocking one another, or ordered by depth rather than left-to-right
+- the repeated instances are placed far away, in the background, or at the far edge of the scene
+- the two extra objects dominate the description or receive too much detail
+- the extra objects are too large or likely to occlude the main repeated subjects
+- the extra objects are the same object or two instances of the same extra object category
+
+Instructions
+- PASS only if the candidate already satisfies the checklist strongly.
+- FIX if the candidate is salvageable; rewrite the prompt naturally while keeping the fixed pair.
+- FAIL only if the draft is unusable.
+
+The last error from the iterative loop was:
+{{LAST_ERROR}}
+
+Now output only the tagged lines.
