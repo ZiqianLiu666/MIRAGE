@@ -9,6 +9,8 @@ Notably, the entire **MIRAGE-Bench** is constructed based on our proposed automa
 ## Automatic Image Synthesis Pipeline
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions.
 
+Please run the following commands in sequence to obtain a complete synthesized dataset.
+
 ### Image Description Generation
 Generate diverse image descriptions:
 ```
@@ -16,7 +18,8 @@ python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
   --pair-template synthesis_pipeline/prompt_template/image_description/prompt_pair_batch.txt \
   --generator-template synthesis_pipeline/prompt_template/image_description/prompt_draft_generator.txt \
   --judge-template synthesis_pipeline/prompt_template/image_description/prompt_judge.txt \
-  --out synthesis_pipeline/source_prompts.jsonl
+  --out synthesis_pipeline/source_prompts.jsonl \
+  --num-samples 200
 ```
 
 ### Image Generation
