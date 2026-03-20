@@ -1,22 +1,22 @@
 # MIRAGE: Benchmarking and Aligning Multi-Instance Image Editing
 [![arXiv](https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/xxxx.xxxxx)
 
-## 1. Requirements
+# 1. Requirements
 Install the required dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-## 2. Benchmark Access
+# 2. Benchmark Access
 We release **MIRAGE-Bench**, which can be downloaded [here](https://drive.google.com/file/d/1nOACtv7H3QXxE78ba9ok-5zZGUWB1vMW/view?usp=sharing). The benchmark contains 100 samples, each consisting of an image, a composite editing instruction formed by combining five sub-instructions, and the corresponding ground-truth mask. This benchmark is designed to evaluate image editing models in more complex referring-expression scenarios. 
 
 Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Automatic Image Synthesis Pipeline**.
 
-## 3. Automatic Image Synthesis Pipeline
+# 3. Automatic Image Synthesis Pipeline
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. 
 Please run the following commands in sequence to obtain a complete synthesized dataset.
 
-### 3.1 Image Description Generation
+## 3.1 Image Description Generation
 Generate diverse image descriptions:
 ```
 python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
@@ -27,7 +27,7 @@ python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
   --num-samples 200
 ```
 
-### 3.2 Image Generation
+## 3.2 Image Generation
 Synthesize images from the generated image descriptions:
 ```
 python synthesis_pipeline/flux_t2i_generate.py \
@@ -35,7 +35,7 @@ python synthesis_pipeline/flux_t2i_generate.py \
   --results-dir synthesis_pipeline/benchmark
 ```
 
-### 3.3 Editing Instruction Generation
+## 3.3 Editing Instruction Generation
 Generate composite editing instructions based on synthetic images and image descriptions:
 ```
 python synthesis_pipeline/generate_instruction_refer.py \
@@ -47,7 +47,7 @@ python synthesis_pipeline/generate_instruction_refer.py \
   --extractor-template synthesis_pipeline/prompt_template/instruction/refer_extract.txt
 ```
 
-### 3.4 Mask Generation
+## 3.4 Mask Generation
 Generate target masks:
 ```
 python synthesis_pipeline/generate_bbox_mask.py \
@@ -56,10 +56,10 @@ python synthesis_pipeline/generate_bbox_mask.py \
   --vis-dir synthesis_pipeline/bbox_mask_vis
 ```
 
-## 4. 推理
+# 4. 推理
 在这里，我们分别提供了在各个基础模型上集成MIRAGE的方法。
 
-### 4.1 目标框定位
+## 4.1 目标框定位
 在推理之前，请你运行以下命令先获取图像中目标区域的crop图:
 ```
 python crop_image.py \
@@ -71,7 +71,7 @@ python crop_image.py \
   --padding 10
 ```
 
-### 4.2 Base model + MIRAGE
+## 4.2 Base model + MIRAGE
 想要获得以下基础模型集成的MIRAGE的结果，请使用以下命令：
 ```
 # FLUX.2[klein]-9B
@@ -84,9 +84,9 @@ python crop_image.py \
 
 ```
 
-## 5. 指标测评
+# 5. 指标测评
 
-### LLM打分
+## LLM打分
 ```
 # PF and Cons (EditScore)
 
@@ -95,7 +95,7 @@ python crop_image.py \
 
 ```
 
-### 传统指标
+## 传统指标
 
 
 
