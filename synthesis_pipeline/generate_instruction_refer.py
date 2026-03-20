@@ -285,14 +285,14 @@ def main():
     for image_name, img_path, source_prompt in tqdm(tasks, desc="slot+gen+extract"):
         image = load_image(img_path)
 
-        slot_out = (qwen.chat_with_qwen_batch([build_slot_messages(slot_template, source_prompt)], max_new_tokens=args.slot_max_new_tokens) or [""])[0]
+        slot_out = (qwen.get_backend().chat_batch([build_slot_messages(slot_template, source_prompt)], max_new_tokens=args.slot_max_new_tokens) or [""])[0]
         slot_plan = parse_slot_plan(slot_out)
 
         last_slot_instructions = None
         gen_warnings: List[str] = []
 
         for attempt in range(1, total_attempts + 1):
-            gen_out = (qwen.chat_with_qwen_batch([build_generator_messages(gen_template, image, image_name, slot_plan, build_feedback(gen_warnings))], max_new_tokens=args.gen_max_new_tokens) or [""])[0]
+            gen_out = (qwen.get_backend().chat_batch([build_generator_messages(gen_template, image, image_name, slot_plan, build_feedback(gen_warnings))], max_new_tokens=args.gen_max_new_tokens) or [""])[0]
             slot_instructions = parse_slot_instructions(gen_out)
             if slot_instructions is None:
                 reason = "could not parse 5 slot_instructions"
@@ -320,7 +320,7 @@ def main():
         ext_warnings: List[str] = []
 
         for attempt in range(1, total_attempts + 1):
-            ext_out = (qwen.chat_with_qwen_batch([build_extractor_messages(ext_template, instructions, build_feedback(ext_warnings))], max_new_tokens=args.ext_max_new_tokens) or [""])[0]
+            ext_out = (qwen.get_backend().chat_batch([build_extractor_messages(ext_template, instructions, build_feedback(ext_warnings))], max_new_tokens=args.ext_max_new_tokens) or [""])[0]
             refer_objects = parse_refer_objects(ext_out)
             if refer_objects is None:
                 reason = "could not parse 5 refer_object"
