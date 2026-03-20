@@ -92,7 +92,7 @@ python synthesis_pipeline/generate_bbox_mask.py \
 
 
 
-## Citation
+# Citation
 If you use this code or the dataset in your research, please cite our paper:
 ```
 xxx
