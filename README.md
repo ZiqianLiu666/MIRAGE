@@ -7,9 +7,16 @@ We release **MIRAGE-Bench**, which can be downloaded [here](https://drive.google
 Notably, the entire **MIRAGE-Bench** is constructed based on our proposed automatic data synthesis pipeline.
 
 ## 自动数据合成管道
-### 图像描述
-```
+这是用于合成图中内容是多相似实例+复合指令的全自动数据合成管道。
 
+### 图像描述
+请使用以下命令生成图像描述：
+```
+python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
+  --pair-template synthesis_pipeline/prompt_template/image_description/prompt_pair_batch.txt \
+  --generator-template synthesis_pipeline/prompt_template/image_description/prompt_draft_generator.txt \
+  --judge-template synthesis_pipeline/prompt_template/image_description/prompt_judge.txt \
+  --out synthesis_pipeline/source_prompts.jsonl
 ```
 
 ### 图像生成
@@ -17,10 +24,11 @@ Notably, the entire **MIRAGE-Bench** is constructed based on our proposed automa
 ```
 python synthesis_pipeline/flux_t2i_generate.py \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
-  --results-dir synthesis_pipeline/benchmark \
+  --results-dir synthesis_pipeline/benchmark
 ```
 
 ### 编辑指令
+请使用以下命令
 ```
 
 ```
