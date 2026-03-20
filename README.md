@@ -1,4 +1,4 @@
-# RefEdit: A Benchmark and Method for Improving Instruction-based Image Editing Model for Referring Expression
+# MIRAGE: Benchmarking and Aligning Multi-Instance Image Editing
 [![arXiv](https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/xxxx.xxxxx)
 
 ## 1. Requirements
