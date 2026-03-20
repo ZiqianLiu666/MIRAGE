@@ -6,11 +6,11 @@ We release **MIRAGE-Bench**, which can be downloaded [here](https://drive.google
 
 Notably, the entire **MIRAGE-Bench** is constructed based on our proposed automatic data synthesis pipeline.
 
-## 自动数据合成管道
-这是用于合成图中内容是多相似实例+复合指令的全自动数据合成管道。
+## Automatic Image Synthesis Pipeline
+We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions.
 
-### 图像描述
-请使用以下命令生成图像描述：
+### Image Description Generation
+Generate diverse image descriptions:
 ```
 python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
   --pair-template synthesis_pipeline/prompt_template/image_description/prompt_pair_batch.txt \
@@ -19,21 +19,31 @@ python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
   --out synthesis_pipeline/source_prompts.jsonl
 ```
 
-### 图像生成
-请使用以下命令进行基于图像描述的图像合成：
+### Image Generation
+Synthesize images from the generated image descriptions:
 ```
 python synthesis_pipeline/flux_t2i_generate.py \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
   --results-dir synthesis_pipeline/benchmark
 ```
 
-### 编辑指令
-请使用以下命令
+### Editing Instruction Generation
+Generate composite editing instructions based on synthetic images and image descriptions:
+```
+python synthesis_pipeline/generate_instruction_refer.py \
+  --image-dir synthesis_pipeline/benchmark \
+  --jsonl synthesis_pipeline/source_prompts.jsonl \
+  --out-jsonl synthesis_pipeline/instruction.jsonl \
+  --slot-template synthesis_pipeline/prompt_template/instruction/repeated_slot_plan.txt \
+  --generator-template synthesis_pipeline/prompt_template/instruction/instruction_generate.txt \
+  --extractor-template synthesis_pipeline/prompt_template/instruction/refer_extract.txt
 ```
 
+### Mask Generation
+Generate target masks:
 ```
-
-### 图像掩码 
-```
-
+python synthesis_pipeline/generate_bbox_mask.py \
+  --image-dir synthesis_pipeline/benchmark \
+  --jsonl synthesis_pipeline/instruction.jsonl \
+  --vis-dir synthesis_pipeline/bbox_mask_vis
 ```
