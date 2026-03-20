@@ -71,8 +71,8 @@ python crop_image.py \
   --padding 10
 ```
 
-### Base model + MIRAGE
-想要获得FLUX.2[klein]-9B集成的MIRAGE的结果，请使用以下命令：
+### 4.2 Base model + MIRAGE
+想要获得以下基础模型集成的MIRAGE的结果，请使用以下命令：
 ```
 # FLUX.2[klein]-9B
 
@@ -86,7 +86,14 @@ python crop_image.py \
 
 ## 5. 指标测评
 
-### EditScore
+### LLM打分
+```
+# PF and Cons (EditScore)
+
+
+# PQ (GPT-5.1)
+
+```
 
 ### 传统指标
 
