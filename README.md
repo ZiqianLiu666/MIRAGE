@@ -1,18 +1,18 @@
 # RefEdit: A Benchmark and Method for Improving Instruction-based Image Editing Model for Referring Expression
 [![arXiv](https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/xxxx.xxxxx)
 
-## Requirements
+## 1. Requirements
 Install the required dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Benchmark Access
+## 2. Benchmark Access
 We release **MIRAGE-Bench**, which can be downloaded [here](https://drive.google.com/file/d/1nOACtv7H3QXxE78ba9ok-5zZGUWB1vMW/view?usp=sharing). The benchmark contains 100 samples, each consisting of an image, a composite editing instruction formed by combining five sub-instructions, and the corresponding ground-truth mask. This benchmark is designed to evaluate image editing models in more complex referring-expression scenarios. 
 
 Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Automatic Image Synthesis Pipeline**.
 
-## Automatic Image Synthesis Pipeline
+## 3. Automatic Image Synthesis Pipeline
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. 
 Please run the following commands in sequence to obtain a complete synthesized dataset.
 
@@ -56,7 +56,7 @@ python synthesis_pipeline/generate_bbox_mask.py \
   --vis-dir synthesis_pipeline/bbox_mask_vis
 ```
 
-## 推理
+## 4. 推理
 在这里，我们分别提供了在各个基础模型上集成MIRAGE的方法。
 
 ### 目标框定位
@@ -83,9 +83,20 @@ python synthesis_pipeline/generate_bbox_mask.py \
 
 ```
 
+## 5. 指标测评
+
+### EditScore
+
+### 传统指标
 
 
 
+
+## Citation
+If you use this code or the dataset in your research, please cite our paper:
+```
+xxx
+```
 
 
 
