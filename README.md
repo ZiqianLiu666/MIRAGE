@@ -1,2 +1,4 @@
-# MIRAGE
-Official Implementation of MIRAGE: Benchmarking and Aligning Multi-Instance Image Editing
+# RefEdit: A Benchmark and Method for Improving Instruction-based Image Editing Model for Referring Expression
+arxiv paper
+
+## Data Access
