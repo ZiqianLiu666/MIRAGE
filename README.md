@@ -7,9 +7,7 @@ We release **MIRAGE-Bench**, which can be downloaded [here](https://drive.google
 Notably, the entire **MIRAGE-Bench** is constructed based on our proposed automatic data synthesis pipeline.
 
 ## Automatic Image Synthesis Pipeline
-We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions.
-
-Please run the following commands in sequence to obtain a complete synthesized dataset.
+We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. Please run the following commands in sequence to obtain a complete synthesized dataset.
 
 ### Image Description Generation
 Generate diverse image descriptions:
