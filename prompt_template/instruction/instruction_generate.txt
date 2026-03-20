@@ -1,0 +1,116 @@
+You are given:
+1) An input image
+2) A slot plan derived from the source prompt
+
+Your task is to generate exactly 5 edit instructions.
+
+Output exactly ONE SINGLE-LINE valid JSON object.
+No markdown. No extra text.
+
+CORE REQUIREMENTS
+
+AUTHORITATIVE INPUTS
+- The slot plan is authoritative for:
+  * repeated instance count
+  * repeated object identity
+  * repeated-instance left-to-right assignment
+- The image is authoritative for:
+  * what is actually visible
+  * which edit type is natural and plausible for each target
+  * the current appearance of each target
+  * whether a preferred non-repeated target is actually visible enough to use
+
+SLOT ASSIGNMENT
+- Let N = repeated_count from the slot plan.
+- You MUST produce EXACTLY 5 slot_instructions.
+
+REPEATED SLOTS (CRITICAL)
+- For slots 1..N:
+  * slot_id must be 1..N in order
+  * target MUST exactly equal repeated_slots[i-1]
+  * edit_instruction MUST contain that exact target verbatim
+- Therefore the first N instructions must cover the repeated instances in strict left-to-right order.
+
+IMPORTANT CASE SPLIT
+- If N = 5:
+  * ALL 5 slot_instructions must target the 5 repeated instances.
+  * Do NOT introduce any non-repeated target.
+  * slot 5 MUST target repeated_slots[4], i.e. the rightmost repeated instance.
+- If N = 4:
+  * slots 1..4 MUST target the 4 repeated instances.
+  * Do NOT stop at only 3 repeated-instance instructions.
+  * slot 4 MUST target repeated_slots[3], i.e. the rightmost repeated instance.
+  * ONLY slot 5 may be the non-repeated filler slot.
+- If N = 3:
+  * slots 1..3 must target the 3 repeated instances
+  * slots 4..5 must target non-repeated visible objects
+
+FILLER SLOTS
+- For slots N+1..5:
+  * Choose non-repeated visible objects only.
+  * Prefer preferred_non_repeated_targets if they are clearly visible and independently identifiable in the image.
+  * If a preferred non-repeated target is not clearly visible or not reliable, choose another standalone visible non-repeated object from the image.
+  * The chosen filler target does NOT need to match the preferred candidate wording if the image suggests a better visible target phrase.
+  * Avoid using repeated instances as reference objects when not needed.
+  * If a repeated instance must be mentioned for context, it may only serve as context; the edited target must still be the non-repeated target itself.
+  * Do NOT shift filler edits back onto repeated instances.
+
+EDIT TYPE CHOICE
+Each edit instruction MUST be exactly one of:
+- Change color / material / texture / surface finish / transparency / reflectiveness of an object or part
+- Add an object/accessory to an existing object/location
+- Remove an object/accessory/part
+- Replace an object or defined part with another
+
+IMPORTANT IMAGE-BASED EDIT SELECTION
+- Use the ACTUAL image content as the primary evidence for choosing edit type and edit content.
+- Use repeated_details and preferred_non_repeated_targets only as secondary support.
+- Make sure the edit would produce a clearly visible change.
+- Do NOT propose a no-op edit.
+  Example: if a handle is already red, do NOT say "change the handle to red".
+- If a part or accessory is clearly visible, you may edit that part instead of the whole object.
+- Across repeated slots, prefer diverse edit types when plausible.
+- Avoid making all repeated-slot instructions simple color changes if the image supports richer edits such as material, texture, add, remove, or replace.
+- If multiple repeated-slot instructions are Change, vary the changed attribute when possible (e.g., color vs material vs texture).
+
+PREVIOUS FAILURE TO AVOID
+{failure_feedback}
+
+GLOBAL RESTRICTIONS
+- Do NOT modify scene/background/global properties.
+- Do NOT change lighting/weather/time/viewpoint.
+- Do NOT change the number of repeated instances.
+- Each instruction affects only ONE edited instance.
+
+FINAL SELF-CHECK
+Before output, verify:
+- each slot_instruction uses the correct slot_id
+- each target exactly matches the required target
+- each edit_instruction contains that target verbatim
+- each proposed edit would visibly change the current appearance in the image
+- if N = 5, slot 5 is NOT a filler and still targets the rightmost repeated instance
+- if N = 4, slot 4 is NOT a filler and still targets the rightmost repeated instance
+- repeated slots are not all trivial color-only edits when the image supports richer alternatives
+
+OUTPUT FORMAT
+Return exactly one JSON object in ONE line:
+
+{"slot_instructions":[
+{"slot_id":1,"target":"...","edit_instruction":"..."},
+{"slot_id":2,"target":"...","edit_instruction":"..."},
+{"slot_id":3,"target":"...","edit_instruction":"..."},
+{"slot_id":4,"target":"...","edit_instruction":"..."},
+{"slot_id":5,"target":"...","edit_instruction":"..."}
+]}
+
+Rules:
+- len(slot_instructions) must be EXACTLY 5
+- slot_id must be 1..5 in order
+- for repeated slots, target must exactly equal the corresponding repeated_slots entry
+- for all slots, edit_instruction must contain target verbatim
+- use double quotes only
+- no trailing commas
+- output NOTHING else
+
+SLOT_PLAN:
+<<<{slot_plan_json}>>>

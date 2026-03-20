@@ -1,0 +1,66 @@
+You are generating ONE repeated-subject image description draft for a text-to-image benchmark.
+
+Output only tagged lines. No JSON. No markdown. No explanations. No digits.
+
+Use exactly this tag style:
+CATEGORY: <plural repeated category>
+SCENE: <realistic scene phrase>
+PROMPT: <one draft photographic paragraph>
+
+Fixed pair
+- CATEGORY = {{FIXED_CATEGORY}}
+- SCENE = {{FIXED_SCENE}}
+
+Fixed targets
+- count_word is {{COUNT_WORD}}
+- there are exactly {{COUNT_NUM}} repeated instances
+- the repeated instances must be ordered and described strictly from left to right only
+- preferred left-to-right position labels are: {{POSITION_LABELS}}
+
+Opening style
+- Do not start the paragraph directly with the subject count.
+- Do not begin with a bare subject listing.
+- The opening should feel like a natural photographic setup, not a rigid template.
+- Vary the opening style across samples. Avoid reusing the same opening stem too often.
+- Good openings may begin with a scene-led clause, a shot-type clause, or a lighting-led clause.
+- Only after this setup should the paragraph introduce the repeated subjects as the main subjects.
+
+Recent opening stems to avoid repeating too often:
+{{RECENT_OPENINGS}}
+
+Main-subject requirements
+- The repeated instances are the real focus of the prompt.
+- They must be explicitly described as the main subjects.
+- They must feel very close to the camera.
+- They must occupy most of the near foreground.
+- They should be described much more fully than any other elements.
+
+Repeated-instance requirements
+- All repeated instances must be fully visible.
+- They must be clearly separated with visible gaps.
+- They must not touch, overlap, intersect, stack, or occlude one another, including front-back occlusion.
+- The prompt must explicitly indicate that the repeated instances are spaced apart with clear gaps and do not touch or overlap.
+- The repeated instances must be distinguished strictly from left to right based on horizontal image position.
+- Do not use front/back, depth order, nearest/farthest, rear/frontmost, or other depth-based ordering for the repeated instances.
+- Each repeated instance must have its own unique local visual attribute.
+- Every repeated instance should be individually referable mainly by left-to-right spatial order and concrete local attributes.
+- The prompt must explicitly reinforce that fine local textures on the repeated instances are clearly visible.
+- The prompt should explicitly convey crisp foreground edges when natural.
+- The prompt should, when natural, imply that the background is secondary or softly blurred, but should not spend many words describing background content.
+- Do not rely only on general material texture or only on nearby relations.
+- Do not force every repeated instance to be near or beside something.
+
+Extra-object requirements
+- Include exactly two extra editable foreground objects.
+- The two extra editable foreground objects must be two different individual objects, not the same object and not two instances of the same extra object category.
+- Identify them mainly through brief concrete appearance details such as material, color, texture, or surface marks rather than position wording.
+- Do not spend many words describing them.
+- They only need enough detail to remain concrete and editable later.
+- Prefer relatively small concrete objects rather than large subjects or structures.
+- They should stay separate from the repeated instances and should not introduce overlap or occlusion risk.
+- Avoid using groups, piles, crowds, actions, large structures, benches, signs, floats, clusters, or visually dominant secondary subjects as the two extra editable objects.
+
+The last attempt failed because:
+{{LAST_ERROR}}
+
+Now output only the tagged lines.
