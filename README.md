@@ -13,7 +13,8 @@ We release **MIRAGE-Bench**, which can be downloaded [here](https://drive.google
 Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Automatic Image Synthesis Pipeline**.
 
 ## Automatic Image Synthesis Pipeline
-We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. Please run the following commands in sequence to obtain a complete synthesized dataset.
+We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. 
+Please run the following commands in sequence to obtain a complete synthesized dataset.
 
 ### Image Description Generation
 Generate diverse image descriptions:
@@ -55,4 +56,54 @@ python synthesis_pipeline/generate_bbox_mask.py \
   --vis-dir synthesis_pipeline/bbox_mask_vis
 ```
 
-## 
+## 推理
+在这里，我们分别提供了在各个基础模型上集成MIRAGE的方法。
+
+### 目标框定位
+请运行以下命令来获取图像中目标区域的crop图:
+```
+
+```
+
+### FLUX.2[klein]-9B + MIRAGE
+要获得FLUX.2[klein]-9B集成的MIRAGE的结果，请使用以下命令：
+```
+
+```
+
+### Flux.2[Dev] + MIRAGE
+要获得Flux.2[Dev]集成的MIRAGE的结果，请使用以下命令：
+```
+
+```
+
+### Qwen-Image-Edit-2511 + MIRAGE
+要获得Qwen-Image-Edit-2511集成的MIRAGE的结果，请使用以下命令：
+```
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
