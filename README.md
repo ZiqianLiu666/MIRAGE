@@ -16,7 +16,7 @@ Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Auto
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. 
 Please run the following commands in sequence to obtain a complete synthesized dataset.
 
-### Image Description Generation
+### 3.1 Image Description Generation
 Generate diverse image descriptions:
 ```
 python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
@@ -27,7 +27,7 @@ python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
   --num-samples 200
 ```
 
-### Image Generation
+### 3.2 Image Generation
 Synthesize images from the generated image descriptions:
 ```
 python synthesis_pipeline/flux_t2i_generate.py \
@@ -35,51 +35,52 @@ python synthesis_pipeline/flux_t2i_generate.py \
   --results-dir synthesis_pipeline/benchmark
 ```
 
-### Editing Instruction Generation
+### 3.3 Editing Instruction Generation
 Generate composite editing instructions based on synthetic images and image descriptions:
 ```
 python synthesis_pipeline/generate_instruction_refer.py \
   --image-dir synthesis_pipeline/benchmark \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
-  --out-jsonl synthesis_pipeline/instruction.jsonl \
+  --out-jsonl synthesis_pipeline/annotations.jsonl \
   --slot-template synthesis_pipeline/prompt_template/instruction/repeated_slot_plan.txt \
   --generator-template synthesis_pipeline/prompt_template/instruction/instruction_generate.txt \
   --extractor-template synthesis_pipeline/prompt_template/instruction/refer_extract.txt
 ```
 
-### Mask Generation
+### 3.4 Mask Generation
 Generate target masks:
 ```
 python synthesis_pipeline/generate_bbox_mask.py \
   --image-dir synthesis_pipeline/benchmark \
-  --jsonl synthesis_pipeline/instruction.jsonl \
+  --jsonl synthesis_pipeline/annotations.jsonl \
   --vis-dir synthesis_pipeline/bbox_mask_vis
 ```
 
 ## 4. 推理
 在这里，我们分别提供了在各个基础模型上集成MIRAGE的方法。
 
-### 目标框定位
-请运行以下命令来获取图像中目标区域的crop图:
+### 4.1 目标框定位
+在推理之前，请你运行以下命令先获取图像中目标区域的crop图:
+```
+python crop_image.py \
+  --image-root synthesis_pipeline/benchmark \
+  --instruction-jsonl generate_benchmark/annotations.jsonl \
+  --output-dir generate_benchmark/filtered_benchmark/crop_pad10_qwen4B \
+  --out-jsonl generate_benchmark/filtered_benchmark/crop_pad10_qwen4B/crop_instruction.jsonl \
+  --vlm-model Qwen/Qwen3-VL-8B-Instruct \
+  --padding 10
 ```
 
+### Base model + MIRAGE
+想要获得FLUX.2[klein]-9B集成的MIRAGE的结果，请使用以下命令：
 ```
+# FLUX.2[klein]-9B
 
-### FLUX.2[klein]-9B + MIRAGE
-要获得FLUX.2[klein]-9B集成的MIRAGE的结果，请使用以下命令：
-```
 
-```
+# Flux.2[Dev] + MIRAGE
 
-### Flux.2[Dev] + MIRAGE
-要获得Flux.2[Dev]集成的MIRAGE的结果，请使用以下命令：
-```
 
-```
-
-### Qwen-Image-Edit-2511 + MIRAGE
-要获得Qwen-Image-Edit-2511集成的MIRAGE的结果，请使用以下命令：
-```
+# Qwen-Image-Edit-2511 + MIRAGE
 
 ```
 
