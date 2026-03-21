@@ -87,7 +87,7 @@ python crop_image.py \
 Run MIRAGE on different base models:
 ```
 # FLUX.2[klein]-9B
-python3 inference_mydemo_flux2_klein9B.py \
+python inference_mydemo_flux2_klein9B.py \
   --image-root benchmark \
   --instruction-jsonl benchmark/annotations.jsonl \
   --crop-dir benchmark/crops \
