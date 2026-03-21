@@ -13,9 +13,6 @@ Install the required dependencies:
 ```bash
 conda create -n mirage python=3.12 -y
 conda activate mirage
-```
-
-```
 pip install -r requirements.txt
 ```
 
