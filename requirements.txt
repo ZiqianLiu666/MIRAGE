@@ -109,7 +109,6 @@ omegaconf==2.3.0
 openai==2.29.0
 openai-harmony==0.0.8
 opencv-python-headless==4.11.0.86
-packaging @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_packaging_1769093650/work
 parso==0.8.6
 partial-json-parser==0.2.1.1.post7
 peft==0.18.1
