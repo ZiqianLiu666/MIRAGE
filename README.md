@@ -75,10 +75,14 @@ python crop_image.py \
 ```
 # FLUX.2[klein]-9B
 
+```
 
+```
 # Flux.2[Dev] + MIRAGE
 
+```
 
+```
 # Qwen-Image-Edit-2511 + MIRAGE
 
 ```
