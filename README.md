@@ -106,7 +106,7 @@ python inference_mydemo_flux2_dev.py \
 ```
 
 ```
-# Qwen-Image-Edit-2511 + MIRAGE (如果你显存不够，你可以加上--cpu-offload model 或者 --cpu-offload sequential)
+# Qwen-Image-Edit-2511 + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python inference_mydemo_qwen2511.py \
   --image-root benchmark \
   --instruction-jsonl benchmark/annotations.jsonl \
