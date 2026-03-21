@@ -5,7 +5,6 @@ import math
 import os
 import re
 from collections import defaultdict
-from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -64,14 +63,11 @@ def load_annotations(path: str) -> List[Dict[str, Any]]:
             item = json.loads(line)
             base_image_path = item["image"]
             editing_prompt = item["editing_instruction"]
-            stem = os.path.splitext(os.path.basename(base_image_path))[0]
             entries.append(
                 {
-                    "file_id": str(item.get("id", stem)),
                     "base_image_path": base_image_path,
                     "image_name": os.path.basename(base_image_path),
                     "editing_prompt": editing_prompt,
-                    "editing_type": str(item.get("editing_type_id", "")),
                     "mask_raw": item["mask"],
                 }
             )
@@ -161,12 +157,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument(
-        "--per_image_result_path",
-        type=str,
-        default="",
-        help="Optional per-image CSV output path. Leave empty to skip per-image dump.",
-    )
-    parser.add_argument(
         "--crop-instruction-jsonl",
         type=str,
         required=True,
@@ -231,83 +221,62 @@ def main() -> None:
     metric_names = tuple(metric_name for metric_name, _ in summary_metrics)
     metric_values: Dict[str, List[float]] = defaultdict(list)
 
-    per_image_context = nullcontext(None)
-    if args.per_image_result_path:
-        os.makedirs(os.path.dirname(args.per_image_result_path) or ".", exist_ok=True)
-        per_image_context = open(
-            args.per_image_result_path, "w", newline="", encoding="utf-8"
-        )
-    
-    with per_image_context as per_image_file:
-        per_image_writer = None
-        if per_image_file is not None:
-            per_image_writer = csv.writer(per_image_file)
-            per_image_writer.writerow(["file_id", "split", "editing_type", *metric_names])
+    for idx, ann in enumerate(annotations):
+        base_image_path = ann["base_image_path"]
 
-        for idx, ann in enumerate(annotations):
-            file_id = ann["file_id"]
-            editing_type = ann["editing_type"]
-            base_image_path = ann["base_image_path"]
+        src_image_path = os.path.join(args.src_image_folder, base_image_path)
+        src_image = Image.open(src_image_path)
+        editing_prompt = ann["editing_prompt"]
+        image_name = ann["image_name"]
 
-            src_image_path = os.path.join(args.src_image_folder, base_image_path)
-            src_image = Image.open(src_image_path)
-            editing_prompt = ann["editing_prompt"]
-            image_name = ann["image_name"]
+        edit_masks: List[np.ndarray] = []
+        edit_prompts: List[str] = []
+        polygons = normalize_polygons(ann["mask_raw"])
+        crop_items = crop_instruction_map.get(image_name)
 
-            edit_masks: List[np.ndarray] = []
-            edit_prompts: List[str] = []
-            polygons = normalize_polygons(ann["mask_raw"])
-            crop_items = crop_instruction_map.get(image_name)
+        for edit_idx, (poly, crop_item) in enumerate(zip(polygons, crop_items)):
+            edit_prompt = crop_item["new_instruction"].strip()
+            edit_mask = mask_decode(poly, src_image.size)
+            edit_masks.append(edit_mask[:, :, np.newaxis].repeat(3, axis=2))
+            edit_prompts.append(edit_prompt)
 
-            for edit_idx, (poly, crop_item) in enumerate(zip(polygons, crop_items)):
-                edit_prompt = crop_item["new_instruction"].strip()
-                edit_mask = mask_decode(poly, src_image.size)
-                edit_masks.append(edit_mask[:, :, np.newaxis].repeat(3, axis=2))
-                edit_prompts.append(edit_prompt)
+        union_mask = np.maximum.reduce(np.stack(edit_masks, axis=0))
 
-            union_mask = np.maximum.reduce(np.stack(edit_masks, axis=0))
+        tgt_image_path = os.path.join(method_path, base_image_path)
+        tgt_image = Image.open(tgt_image_path)
 
-            row_values: List[Any] = [file_id, "all", editing_type]
-
-            tgt_image_path = os.path.join(method_path, base_image_path)
-            tgt_image = Image.open(tgt_image_path)
-
-            for metric in metric_names:
-                if metric == "clip_similarity_target_image_edit_part":
-                    per_edit_scores: List[float] = []
-                    for edit_mask, edit_prompt in zip(edit_masks, edit_prompts):
-                        score = calculate_metric(
-                            metrics_calculator,
-                            metric,
-                            src_image,
-                            tgt_image,
-                            edit_mask,
-                            edit_mask,
-                            edit_prompt,
-                        )
-                        numeric_score = _finite_float_or_none(score)
-                        per_edit_scores.append(numeric_score)
-                    metric_score = _mean(per_edit_scores)
-                else:
+        for metric in metric_names:
+            if metric == "clip_similarity_target_image_edit_part":
+                per_edit_scores: List[float] = []
+                for edit_mask, edit_prompt in zip(edit_masks, edit_prompts):
                     score = calculate_metric(
                         metrics_calculator,
                         metric,
                         src_image,
                         tgt_image,
-                        union_mask,
-                        union_mask,
-                        editing_prompt,
+                        edit_mask,
+                        edit_mask,
+                        edit_prompt,
                     )
-                    metric_score = _finite_float_or_none(score)
+                    numeric_score = _finite_float_or_none(score)
+                    per_edit_scores.append(numeric_score)
+                metric_score = _mean(per_edit_scores)
+            else:
+                score = calculate_metric(
+                    metrics_calculator,
+                    metric,
+                    src_image,
+                    tgt_image,
+                    union_mask,
+                    union_mask,
+                    editing_prompt,
+                )
+                metric_score = _finite_float_or_none(score)
 
-                row_values.append(metric_score)
-                metric_values[metric].append(metric_score)
+            metric_values[metric].append(metric_score)
 
-            if per_image_writer is not None:
-                per_image_writer.writerow(row_values)
-
-            if (idx + 1) % 20 == 0 or idx + 1 == len(annotations):
-                print(f"Processed {idx + 1}/{len(annotations)}")
+        if (idx + 1) % 20 == 0 or idx + 1 == len(annotations):
+            print(f"Processed {idx + 1}/{len(annotations)}")
 
     _append_summary(
         output_csv=args.result_path,
@@ -316,8 +285,6 @@ def main() -> None:
         metric_values=metric_values,
     )
     print(f"Saved aggregated metrics to: {args.result_path}")
-    if args.per_image_result_path:
-        print(f"Saved per-image metrics to: {args.per_image_result_path}")
 
 
 if __name__ == "__main__":
