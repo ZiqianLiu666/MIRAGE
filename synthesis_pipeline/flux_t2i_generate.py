@@ -28,8 +28,14 @@ def parse_args():
     )
     p.add_argument(
         "--cpu-offload",
-        action="store_true",
-        help="Use enable_model_cpu_offload() instead of keeping the full pipeline on --device.",
+        default="model",
+        choices=["none", "model", "sequential"],
+        help=(
+            "CPU offload mode. "
+            "'model' uses enable_model_cpu_offload (recommended), "
+            "'sequential' uses enable_sequential_cpu_offload (more memory saving, slower), "
+            "'none' keeps full model on --device."
+        ),
     )
     p.add_argument("--device", default="cuda:0", help="Device string.")
     p.add_argument(
@@ -71,7 +77,7 @@ def dtype_from_str(dtype_str: str):
     return torch.float32
 
 
-def load_pipeline(repo_id: str, device: str, torch_dtype, cpu_offload: bool = False):
+def load_pipeline(repo_id: str, device: str, torch_dtype, cpu_offload: str = "model"):
     print("Loading text encoder...")
     text_encoder = Mistral3ForConditionalGeneration.from_pretrained(
         repo_id,
@@ -79,7 +85,7 @@ def load_pipeline(repo_id: str, device: str, torch_dtype, cpu_offload: bool = Fa
         torch_dtype=torch_dtype,
         low_cpu_mem_usage=True,
     )
-    if not cpu_offload:
+    if cpu_offload == "none":
         text_encoder = text_encoder.to(device)
 
     print("Loading DiT transformer...")
@@ -89,7 +95,7 @@ def load_pipeline(repo_id: str, device: str, torch_dtype, cpu_offload: bool = Fa
         torch_dtype=torch_dtype,
         low_cpu_mem_usage=True,
     )
-    if not cpu_offload:
+    if cpu_offload == "none":
         dit = dit.to(device)
 
     print("Loading Flux2Pipeline...")
@@ -99,8 +105,11 @@ def load_pipeline(repo_id: str, device: str, torch_dtype, cpu_offload: bool = Fa
         transformer=dit,
         torch_dtype=torch_dtype,
     )
-    if cpu_offload:
-        pipe.enable_model_cpu_offload()
+    if cpu_offload != "none":
+        if cpu_offload == "sequential":
+            pipe.enable_sequential_cpu_offload()
+        else:
+            pipe.enable_model_cpu_offload()
     else:
         pipe = pipe.to(device)
     return pipe
