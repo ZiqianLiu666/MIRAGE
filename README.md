@@ -55,11 +55,12 @@ python synthesis_pipeline/generate_bbox_mask.py \
   --vis-dir synthesis_pipeline/benchmark/bbox_mask_vis
 ```
 
-# 4. 推理
-在这里，我们分别提供了在各个基础模型上集成MIRAGE的方法。
+# 4. Inference
+We provide MIRAGE integration pipelines for multiple base image editing models.
 
-## 4.1 目标框定位
-在推理之前，请你运行以下命令先获取图像中目标区域的crop图:
+## 4.1 Target Localization
+Before running inference, first obtain cropped regions corresponding to the target objects:
+
 ```
 python crop_image.py \
   --image-root synthesis_pipeline/benchmark \
@@ -71,7 +72,7 @@ python crop_image.py \
 ```
 
 ## 4.2 Base model + MIRAGE
-想要获得以下基础模型集成的MIRAGE的结果，请使用以下命令：
+Run MIRAGE on different base models:
 ```
 # FLUX.2[klein]-9B
 python3 inference_mydemo_flux2_klein9B.py \
@@ -102,9 +103,9 @@ python inference_mydemo_qwen2511.py \
   --patch-ratio 0.2
 ```
 
-# 5. 指标测评
-## LLM打分
-注意这里的PF和Cons是用本地开源的 Qwen 运行得到，而PQ调用的是GPT的API
+# 5. Evaluation
+## LLM-based Metrics
+PF and Cons are computed using a local open-source Qwen model, while PQ is evaluated using the GPT API.
 ```
 # PF, Cons, PQ
 python metrics/EditScore/evaluation.py \
@@ -119,17 +120,17 @@ python metrics/EditScore/evaluation.py \
   --num-pass 3 \
 ```
 
-## 传统指标
+## Traditional Metrics
+Compute pixel-level similarity metrics:
+
 ```
 # MSE, LPIPS, PSNR...
 python metrics/traditional/evalaute_traditional.py \
-  --annotation_mapping_file generate_benchmark/instruction.fixed.jsonl \
-  --src_image_folder generate_benchmark/filtered_benchmark \
-  --crop-instruction-jsonl generate_benchmark/crops/crop_instruction.jsonl \
-  --tgt_method results_ours_flux2_dev \
-  --result_path metrics/traditional/table5_summary.csv \
-  --per_image_result_path metrics/traditional/table5_per_image.csv \
-  --device cuda:0
+  --annotation_mapping_file synthesis_pipeline/benchmark/annotations.jsonl \
+  --src_image_folder synthesis_pipeline/benchmark \
+  --crop-instruction-jsonl synthesis_pipeline/benchmark/crops/crop_instruction.jsonl \
+  --tgt_method your_results \
+  --result_path metrics/traditional/metric_summary.csv \
 ```
 
 # Citation
