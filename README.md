@@ -46,7 +46,7 @@ python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
   --out synthesis_pipeline/source_prompts.jsonl \
   --num-samples 200
 
-## 3.2 Image Generation
+## 3.2 Image Generation (If GPU memory is insufficient, you can enable CPU offloading by adding --cpu-offload)
 python synthesis_pipeline/flux_t2i_generate.py \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
   --results-dir benchmark
@@ -96,7 +96,7 @@ python inference_mydemo_flux2_klein9B.py \
 ```
 
 ```
-# Flux.2[Dev] + MIRAGE
+# Flux.2[Dev] + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python inference_mydemo_flux2_dev.py \
   --image-root benchmark \
   --instruction-jsonl benchmark/annotations.jsonl \
@@ -106,7 +106,7 @@ python inference_mydemo_flux2_dev.py \
 ```
 
 ```
-# Qwen-Image-Edit-2511 + MIRAGE
+# Qwen-Image-Edit-2511 + MIRAGE (如果你显存不够，你可以加上--cpu-offload model 或者 --cpu-offload sequential)
 python inference_mydemo_qwen2511.py \
   --image-root benchmark \
   --instruction-jsonl benchmark/annotations.jsonl \
