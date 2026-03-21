@@ -142,7 +142,7 @@ python metrics/traditional/evalaute_traditional.py \
   --src_image_folder benchmark \
   --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
   --tgt_method results/your_results \
-  --result_path metrics/results/traditional/metric_summary.csv
+  --result_path metrics/results/traditional/your_results/metric_summary.csv
 ```
 
 # Citation
