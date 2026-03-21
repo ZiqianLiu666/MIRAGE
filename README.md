@@ -125,7 +125,7 @@ python metrics/EditScore/evaluation.py \
   --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
   --input-image-root benchmark \
   --edited-image-root results/your_results \
-  --result-dir metrics_results/LLM/your_results \
+  --result-dir metrics/results/LLM/your_results \
   --sc-model-name-or-path Qwen/Qwen3-VL-8B-Instruct \
   --pq-model-name-or-path gpt-4.1 \
   --pq-key YOUR_OPENAI_API_KEY \
@@ -142,7 +142,7 @@ python metrics/traditional/evalaute_traditional.py \
   --src_image_folder benchmark \
   --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
   --tgt_method results/your_results \
-  --result_path metrics_results/traditional/metric_summary.csv \
+  --result_path metrics/results/traditional/metric_summary.csv \
 ```
 
 # Citation
