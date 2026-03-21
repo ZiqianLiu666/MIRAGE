@@ -122,7 +122,7 @@ python metrics/EditScore/evaluation.py \
 ## 传统指标
 ```
 # MSE, LPIPS, PSNR...
-python metrics/traditional/evalaute_refedit_final.py \
+python metrics/traditional/evalaute_traditional.py \
   --annotation_mapping_file generate_benchmark/instruction.fixed.jsonl \
   --src_image_folder generate_benchmark/filtered_benchmark \
   --crop-instruction-jsonl generate_benchmark/crops/crop_instruction.jsonl \
