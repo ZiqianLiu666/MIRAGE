@@ -1,3 +1,4 @@
+import os
 import json
 from typing import List, Optional
 from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
@@ -131,32 +132,37 @@ def locate_refer_object_batch(image_inputs, refer_objects):
 
     batch_messages = []
     for image_input, refer_object in zip(image_inputs, refer_objects):
-        system_prompt = f"""
-You are a precise referring-expression object localizer.
-Task: Given ONE image and ONE referring phrase, output ONE bounding box.
+        system_prompt = fuser_prompt = f"""
+You are a precise object detector for referring expressions.
 
-Core rule:
-- Identify the HOST instance described in the phrase.
-- If a PART/ATTRIBUTE of that host is specified (e.g., X of/on/worn by/attached to Y), localize the PART only if it is clearly visible on that SAME host.
-- If the part is unclear, unreadable, or not confidently localized, FALL BACK to boxing the HOST instance itself.
+Task:
+Given one image and one referring phrase, output one tight bounding box for the target.
 
-Critical constraints:
-- NEVER switch to another instance even if the attribute appears elsewhere.
-- Use spatial cues (leftmost/rightmost/middle/between, etc.) to select exactly ONE matching host.
-- The selected instance MUST match all host attributes.
+Part rule (critical):
+If the phrase has the form "X of Y" or "Y's X",
+the target to box is X (the PART), while Y is only used to identify which instance.
+Example: "glasses of the leftmost person" → box the glasses only, not the whole person.
 
-Box tightness and coordinates:
-- Tight box only around the part or whole host.
-- Coordinates are normalized to [0,1000].
-- (0,0)=top-left, (1000,1000)=bottom-right.
+Disambiguation:
+If multiple similar objects exist, use spatial cues such as
+"leftmost", "rightmost", "middle", "center", "between A and B"
+to select exactly one instance.
 
-Output ONLY:
-[{{"bbox_2d":[x_min,y_min,x_max,y_max],"label":"{refer_object}"}}]
+Tightness:
+The box must tightly cover only the visible target with minimal padding.
+Do NOT include large surrounding regions (e.g. full body when target is glasses).
 
-No explanation. Valid JSON only.
+Coordinates:
+Use normalized coordinates in [0,1000].
+(0,0)=top-left, (1000,1000)=bottom-right.
+Output integers only.
 
-Target phrase:
-{refer_object}
+Output ONLY one JSON object:
+[
+{{"bbox_2d":[x_min,y_min,x_max,y_max],"label":"{refer_object}"}}
+]
+
+Target phrase: {refer_object}
 """.strip()
 
         messages = [

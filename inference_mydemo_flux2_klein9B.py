@@ -232,10 +232,6 @@ def main():
         image_root = args.image_root
         image_names = sorted(crop_map.keys())
         print(f"Found {len(image_names)} images with crop records.")
-        if image_names:
-            print(
-                f"Forward order: start from {image_names[0]}, end at {image_names[-1]}."
-            )
 
     run_inference_loop(
         pipe=pipe,

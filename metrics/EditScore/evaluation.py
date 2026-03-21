@@ -30,7 +30,10 @@ class EvalSample:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Evaluate EditScore on mybench. SC uses local Qwen; PQ uses API."
+        description=(
+            "Evaluate EditScore on mybench. SC uses local Qwen with multi-pass "
+            "averaging; PQ uses a single OpenAI API pass."
+        )
     )
     parser.add_argument("--annotations-jsonl", type=Path, required=True)
     parser.add_argument("--crop-instruction-jsonl", type=Path, required=True)
@@ -41,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sc-backbone",
         type=str,
-        default="qwen3vllm",
+        default="qwen3vl_vllm",
         choices=["qwen25vl", "qwen25vl_vllm", "qwen3vl", "qwen3vl_vllm"],
     )
     parser.add_argument(
@@ -51,7 +54,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--sc-lora-path", type=str, default=None)
 
-    parser.add_argument("--pq-model-name-or-path", type=str, default="gpt-4.1")
+    parser.add_argument("--pq-model-name-or-path", type=str, default="gpt-5.1")
     parser.add_argument(
         "--pq-openai-url",
         type=str,
@@ -59,7 +62,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--pq-key", type=str, required=True)
 
-    parser.add_argument("--num-pass", type=int, default=1)
+    parser.add_argument(
+        "--num-pass",
+        type=int,
+        default=1,
+        help="Number of SC/Qwen passes to average. PQ/OpenAI is always single-pass.",
+    )
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--score-range", type=int, default=25)
     parser.add_argument("--tensor-parallel-size", type=int, default=1)
@@ -213,6 +221,13 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def append_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
 def build_sc_scorer(args: argparse.Namespace) -> EditScore:
     return EditScore(
         backbone=args.sc_backbone,
@@ -237,7 +252,7 @@ def build_pq_scorer(args: argparse.Namespace) -> EditScore:
         model_name_or_path=args.pq_model_name_or_path,
         score_range=args.score_range,
         temperature=args.temperature,
-        num_pass=args.num_pass,
+        num_pass=1,
     )
 
 
@@ -248,6 +263,11 @@ def evaluate_mybench(
     output_dir: Path,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
+    per_edit_path = output_dir / "per_edit_results.jsonl"
+    per_image_path = output_dir / "per_image_results.jsonl"
+    per_edit_path.write_text("", encoding="utf-8")
+    per_image_path.write_text("", encoding="utf-8")
+
     per_edit_rows: list[dict[str, Any]] = []
     per_image_rows: list[dict[str, Any]] = []
 
@@ -289,6 +309,7 @@ def evaluate_mybench(
             }
             per_edit_rows.append(per_edit_row)
             this_image_edit_rows.append(per_edit_row)
+            append_jsonl(per_edit_path, [per_edit_row])
 
         image_prompt_following = metric_mean(this_image_edit_rows, "prompt_following")
         image_consistency = metric_mean(this_image_edit_rows, "consistency")
@@ -296,19 +317,19 @@ def evaluate_mybench(
             min(image_prompt_following, image_consistency) * image_perceptual_quality
         )
 
-        per_image_rows.append(
-            {
-                "key": sample.key,
-                "num_crops": len(sample.crop_edits),
-                "num_sc_evals": len(this_image_edit_rows),
-                "prompt_following": image_prompt_following,
-                "consistency": image_consistency,
-                "perceptual_quality": image_perceptual_quality,
-                "overall": image_overall,
-                "SC_reasoning": [row["SC_reasoning"] for row in this_image_edit_rows],
-                "PQ_reasoning": image_pq_reasoning,
-            }
-        )
+        per_image_row = {
+            "key": sample.key,
+            "num_crops": len(sample.crop_edits),
+            "num_sc_evals": len(this_image_edit_rows),
+            "prompt_following": image_prompt_following,
+            "consistency": image_consistency,
+            "perceptual_quality": image_perceptual_quality,
+            "overall": image_overall,
+            "SC_reasoning": [row["SC_reasoning"] for row in this_image_edit_rows],
+            "PQ_reasoning": image_pq_reasoning,
+        }
+        per_image_rows.append(per_image_row)
+        append_jsonl(per_image_path, [per_image_row])
 
     def summarize_sc(rows: list[dict[str, Any]]) -> dict[str, float]:
         return {
@@ -332,9 +353,6 @@ def evaluate_mybench(
     dataset_pq = metric_mean(per_image_rows, "perceptual_quality")
     per_edit_metric = add_overall(summarize_sc(per_edit_rows), dataset_pq)
     per_image_metric = add_overall(summarize_sc(per_image_rows), dataset_pq)
-
-    write_jsonl(output_dir / "per_edit_results.jsonl", per_edit_rows)
-    write_jsonl(output_dir / "per_image_results.jsonl", per_image_rows)
 
     summary = {
         "dataset_type": "mybench",

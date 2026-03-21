@@ -26,6 +26,11 @@ def parse_args():
         default="black-forest-labs/FLUX.2-dev",
         help="Model repo id.",
     )
+    p.add_argument(
+        "--cpu-offload",
+        action="store_true",
+        help="Use enable_model_cpu_offload() instead of keeping the full pipeline on --device.",
+    )
     p.add_argument("--device", default="cuda:0", help="Device string.")
     p.add_argument(
         "--dtype", default="bf16", choices=["bf16", "fp16", "fp32"], help="Torch dtype."
@@ -66,14 +71,16 @@ def dtype_from_str(dtype_str: str):
     return torch.float32
 
 
-def load_pipeline(repo_id: str, device: str, torch_dtype):
+def load_pipeline(repo_id: str, device: str, torch_dtype, cpu_offload: bool = False):
     print("Loading text encoder...")
     text_encoder = Mistral3ForConditionalGeneration.from_pretrained(
         repo_id,
         subfolder="text_encoder",
         torch_dtype=torch_dtype,
         low_cpu_mem_usage=True,
-    ).to(device)
+    )
+    if not cpu_offload:
+        text_encoder = text_encoder.to(device)
 
     print("Loading DiT transformer...")
     dit = AutoModel.from_pretrained(
@@ -81,7 +88,9 @@ def load_pipeline(repo_id: str, device: str, torch_dtype):
         subfolder="transformer",
         torch_dtype=torch_dtype,
         low_cpu_mem_usage=True,
-    ).to(device)
+    )
+    if not cpu_offload:
+        dit = dit.to(device)
 
     print("Loading Flux2Pipeline...")
     pipe = Flux2Pipeline.from_pretrained(
@@ -89,14 +98,25 @@ def load_pipeline(repo_id: str, device: str, torch_dtype):
         text_encoder=text_encoder,
         transformer=dit,
         torch_dtype=torch_dtype,
-    ).to(device)
+    )
+    if cpu_offload:
+        pipe.enable_model_cpu_offload()
+    else:
+        pipe = pipe.to(device)
     return pipe
+
+
 def main():
     args = parse_args()
     os.makedirs(args.results_dir, exist_ok=True)
 
     torch_dtype = dtype_from_str(args.dtype)
-    pipe = load_pipeline(args.repo_id, args.device, torch_dtype)
+    pipe = load_pipeline(
+        args.repo_id,
+        args.device,
+        torch_dtype,
+        cpu_offload=args.cpu_offload,
+    )
     with open(args.jsonl, "r", encoding="utf-8") as f:
         lines = [ln for ln in f if ln.strip()]
 
