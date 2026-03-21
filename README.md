@@ -43,7 +43,7 @@ python synthesis_pipeline/flux_t2i_generate.py \
 python synthesis_pipeline/generate_instruction_refer.py \
   --image-dir synthesis_pipeline/benchmark \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
-  --out-jsonl synthesis_pipeline/annotations.jsonl \
+  --out-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
   --slot-template synthesis_pipeline/prompt_template/instruction/repeated_slot_plan.txt \
   --generator-template synthesis_pipeline/prompt_template/instruction/instruction_generate.txt \
   --extractor-template synthesis_pipeline/prompt_template/instruction/refer_extract.txt
@@ -51,8 +51,8 @@ python synthesis_pipeline/generate_instruction_refer.py \
 ## 3.4 Mask Generation
 python synthesis_pipeline/generate_bbox_mask.py \
   --image-dir synthesis_pipeline/benchmark \
-  --jsonl synthesis_pipeline/annotations.jsonl \
-  --vis-dir synthesis_pipeline/bbox_mask_vis
+  --jsonl synthesis_pipeline/benchmark/annotations.jsonl \
+  --vis-dir synthesis_pipeline/benchmark/bbox_mask_vis
 ```
 
 # 4. 推理
@@ -63,10 +63,10 @@ python synthesis_pipeline/generate_bbox_mask.py \
 ```
 python crop_image.py \
   --image-root synthesis_pipeline/benchmark \
-  --instruction-jsonl generate_benchmark/annotations.jsonl \
-  --output-dir generate_benchmark/filtered_benchmark/crop_pad10_qwen4B \
-  --out-jsonl generate_benchmark/filtered_benchmark/crop_pad10_qwen4B/crop_instruction.jsonl \
-  --vlm-model Qwen/Qwen3-VL-8B-Instruct \
+  --instruction-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
+  --output-dir synthesis_pipeline/benchmark/crops \
+  --out-jsonl synthesis_pipeline/benchmark/crops/crop_instruction.jsonl \
+  --batch-size 2 \
   --padding 10
 ```
 
@@ -74,33 +74,62 @@ python crop_image.py \
 想要获得以下基础模型集成的MIRAGE的结果，请使用以下命令：
 ```
 # FLUX.2[klein]-9B
-
+python3 inference_mydemo_flux2_klein9B.py \
+  --image-root synthesis_pipeline/benchmark \
+  --instruction-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
+  --crop-dir synthesis_pipeline/benchmark/crops \
+  --results-full-dir synthesis_pipeline/results_flux2_klein9B \
+  --patch-ratio 0.2
 ```
 
 ```
 # Flux.2[Dev] + MIRAGE
-
+python inference_mydemo_flux2_dev.py \
+  --image-root synthesis_pipeline/benchmark \
+  --instruction-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
+  --crop-dir synthesis_pipeline/benchmark/crops \
+  --results-full-dir synthesis_pipeline/results_flux2_dev \
+  --patch-ratio 0.2
 ```
 
 ```
 # Qwen-Image-Edit-2511 + MIRAGE
-
+python inference_mydemo_qwen2511.py \
+  --image-root synthesis_pipeline/benchmark \
+  --instruction-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
+  --crop-dir synthesis_pipeline/benchmark/crops \
+  --results-full-dir synthesis_pipeline/results_qwen2511 \
+  --patch-ratio 0.2
 ```
 
 # 5. 指标测评
-
 ## LLM打分
+注意这里的PF和Cons是用本地开源的 Qwen 运行得到，而PQ调用的是GPT的API
 ```
-# PF and Cons (EditScore)
-
-
-# PQ (GPT-5.1)
-
+# PF, Cons, PQ
+python metrics/EditScore/evaluation.py \
+  --annotations-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
+  --crop-instruction-jsonl synthesis_pipeline/benchmark/crops/crop_instruction.jsonl \
+  --input-image-root synthesis_pipeline/benchmark \
+  --edited-image-root your_results \
+  --result-dir metrics/EditScore/runs/your_results \
+  --sc-model-name-or-path Qwen/Qwen3-VL-8B-Instruct \
+  --pq-model-name-or-path gpt-4.1 \
+  --pq-key YOUR_OPENAI_API_KEY \
+  --num-pass 3 \
 ```
 
 ## 传统指标
 ```
-
+# MSE, LPIPS, PSNR...
+python metrics/traditional/evalaute_refedit_final.py \
+  --annotation_mapping_file generate_benchmark/instruction.fixed.jsonl \
+  --src_image_folder generate_benchmark/filtered_benchmark \
+  --crop-instruction-jsonl generate_benchmark/crops/crop_instruction.jsonl \
+  --tgt_method results_ours_flux2_dev \
+  --result_path metrics/traditional/table5_summary.csv \
+  --per_image_result_path metrics/traditional/table5_per_image.csv \
+  --device cuda:0
 ```
 
 # Citation
