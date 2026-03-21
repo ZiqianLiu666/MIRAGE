@@ -11,7 +11,7 @@
 # 1. Requirements
 Install the required dependencies:
 ```bash
-conda create -n mirage python=3.10 -y
+conda create -n mirage python=3.12 -y
 conda activate mirage
 ```
 
