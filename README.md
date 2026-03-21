@@ -37,22 +37,22 @@ python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
 ## 3.2 Image Generation
 python synthesis_pipeline/flux_t2i_generate.py \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
-  --results-dir synthesis_pipeline/benchmark
+  --results-dir benchmark
 
 ## 3.3 Editing Instruction Generation
 python synthesis_pipeline/generate_instruction_refer.py \
-  --image-dir synthesis_pipeline/benchmark \
+  --image-dir benchmark \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
-  --out-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
+  --out-jsonl benchmark/annotations.jsonl \
   --slot-template synthesis_pipeline/prompt_template/instruction/repeated_slot_plan.txt \
   --generator-template synthesis_pipeline/prompt_template/instruction/instruction_generate.txt \
   --extractor-template synthesis_pipeline/prompt_template/instruction/refer_extract.txt
 
 ## 3.4 Mask Generation
 python synthesis_pipeline/generate_bbox_mask.py \
-  --image-dir synthesis_pipeline/benchmark \
-  --jsonl synthesis_pipeline/benchmark/annotations.jsonl \
-  --vis-dir synthesis_pipeline/benchmark/bbox_mask_vis
+  --image-dir benchmark \
+  --jsonl benchmark/annotations.jsonl \
+  --vis-dir benchmark/bbox_mask_vis
 ```
 
 # 4. Inference
