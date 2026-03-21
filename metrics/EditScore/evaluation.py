@@ -41,7 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sc-backbone",
         type=str,
-        default="qwen3vl",
+        default="qwen3vllm",
         choices=["qwen25vl", "qwen25vl_vllm", "qwen3vl", "qwen3vl_vllm"],
     )
     parser.add_argument(
