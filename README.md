@@ -35,7 +35,7 @@ Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Auto
 # 3. Automatic Image Synthesis Pipeline
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. Please run the following commands in sequence to obtain a complete synthesized dataset.
 
-Alternatively, you may directly download the benchmark from the link above and proceed to [Sec. 4.2 (Base model + MIRAGE)](#42-base-model--mirage) for inference.
+Alternatively, you may directly download the benchmark from the link above and proceed to [4.2 Base model + MIRAGE](#42-base-model--mirage) for inference.
 
 ```
 ## 3.1 Image Description Generation
