@@ -27,7 +27,7 @@ source ~/.bashrc
 # 2. Benchmark Access
 We release **MIRAGE-Bench**, which can be downloaded [here](https://drive.google.com/file/d/1VK8Vu7Vdw35GWb7IapZLFSugoJTblTDx/view?usp=sharing). The benchmark contains 100 samples, each consisting of an image, a composite editing instruction formed by combining five sub-instructions, and the corresponding ground-truth mask. This benchmark is designed to evaluate image editing models in more complex referring-expression scenarios. 
 
-Alternatively, you can directly download the benchmark from the link above and proceed to [4.2 Base model + MIRAGE](#42-base-model--mirage) for inference, skipping 3. Automatic Image Synthesis Pipeline.
+Alternatively, you can directly download the benchmark from the link above and proceed to [4.2 Base model + MIRAGE](#42-base-model--mirage) for inference, skipping **3. Automatic Image Synthesis Pipeline**.
 
 Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Automatic Image Synthesis Pipeline**.
 
