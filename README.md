@@ -18,7 +18,7 @@ pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https
 pip install -r requirements.txt
 ```
 
-Don't forget to log in to your Hugging Face account:
+Don't forget to log in to your Hugging Face account to increase the model download speed:
 ```
 echo 'export HF_TOKEN=xxx' >> ~/.bashrc
 source ~/.bashrc
