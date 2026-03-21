@@ -554,7 +554,7 @@ def main():
 
             image_id = produced + 1
             rec = {"image": f"{image_id}.jpg", "source_prompt": accepted["source_prompt"]}
-            f.write(json.dumps(rec, ensure_ascii=False) + "\\n")
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             f.flush()
 
             opening_stem = " ".join(norm(accepted["source_prompt"]).split()[:4])
