@@ -16,7 +16,7 @@ conda activate mirage
 pip install -r requirements.txt
 ```
 
-Don't forget to log in to your Hugging Face account:
+Don't forget to log in to your Hugging Face account to get model access:
 ```
 echo 'export HF_TOKEN=xxx' >> ~/.bashrc
 source ~/.bashrc
