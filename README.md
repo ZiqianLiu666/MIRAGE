@@ -11,9 +11,11 @@ Install the required dependencies:
 ```bash
 pip install -r requirements.txt
 ```
+
+Don't forget to log in to your Hugging Face account:
 ```
-# 请不要忘记登录你的 Hugging Face 账号
-huggingface-cli login
+echo 'export HF_TOKEN=xxx' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 # 2. Benchmark Access
