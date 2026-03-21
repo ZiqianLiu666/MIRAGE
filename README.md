@@ -24,28 +24,21 @@ Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Auto
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. 
 Please run the following commands in sequence to obtain a complete synthesized dataset.
 
-## 3.1 Image Description Generation
-Generate diverse image descriptions:
 ```
+## 3.1 Image Description Generation
 python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
   --pair-template synthesis_pipeline/prompt_template/image_description/prompt_pair_batch.txt \
   --generator-template synthesis_pipeline/prompt_template/image_description/prompt_draft_generator.txt \
   --judge-template synthesis_pipeline/prompt_template/image_description/prompt_judge.txt \
   --out synthesis_pipeline/source_prompts.jsonl \
   --num-samples 200
-```
 
 ## 3.2 Image Generation
-Synthesize images from the generated image descriptions:
-```
 python synthesis_pipeline/flux_t2i_generate.py \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
   --results-dir synthesis_pipeline/benchmark
-```
 
 ## 3.3 Editing Instruction Generation
-Generate composite editing instructions based on synthetic images and image descriptions:
-```
 python synthesis_pipeline/generate_instruction_refer.py \
   --image-dir synthesis_pipeline/benchmark \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
@@ -53,11 +46,8 @@ python synthesis_pipeline/generate_instruction_refer.py \
   --slot-template synthesis_pipeline/prompt_template/instruction/repeated_slot_plan.txt \
   --generator-template synthesis_pipeline/prompt_template/instruction/instruction_generate.txt \
   --extractor-template synthesis_pipeline/prompt_template/instruction/refer_extract.txt
-```
 
 ## 3.4 Mask Generation
-Generate target masks:
-```
 python synthesis_pipeline/generate_bbox_mask.py \
   --image-dir synthesis_pipeline/benchmark \
   --jsonl synthesis_pipeline/annotations.jsonl \
