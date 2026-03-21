@@ -75,10 +75,10 @@ Before running inference, first obtain cropped regions corresponding to the targ
 
 ```
 python crop_image.py \
-  --image-root synthesis_pipeline/benchmark \
-  --instruction-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
-  --output-dir synthesis_pipeline/benchmark/crops \
-  --out-jsonl synthesis_pipeline/benchmark/crops/crop_instruction.jsonl \
+  --image-root benchmark \
+  --instruction-jsonl benchmark/annotations.jsonl \
+  --output-dir benchmark/crops \
+  --out-jsonl benchmark/crops/crop_instruction.jsonl \
   --batch-size 2 \
   --padding 10
 ```
@@ -88,30 +88,30 @@ Run MIRAGE on different base models:
 ```
 # FLUX.2[klein]-9B
 python3 inference_mydemo_flux2_klein9B.py \
-  --image-root synthesis_pipeline/benchmark \
-  --instruction-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
-  --crop-dir synthesis_pipeline/benchmark/crops \
-  --results-full-dir synthesis_pipeline/results_flux2_klein9B \
+  --image-root benchmark \
+  --instruction-jsonl benchmark/annotations.jsonl \
+  --crop-dir benchmark/crops \
+  --results-full-dir results/flux2_klein9B \
   --patch-ratio 0.2
 ```
 
 ```
 # Flux.2[Dev] + MIRAGE
 python inference_mydemo_flux2_dev.py \
-  --image-root synthesis_pipeline/benchmark \
-  --instruction-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
-  --crop-dir synthesis_pipeline/benchmark/crops \
-  --results-full-dir synthesis_pipeline/results_flux2_dev \
+  --image-root benchmark \
+  --instruction-jsonl benchmark/annotations.jsonl \
+  --crop-dir benchmark/crops \
+  --results-full-dir results/flux2_dev \
   --patch-ratio 0.2
 ```
 
 ```
 # Qwen-Image-Edit-2511 + MIRAGE
 python inference_mydemo_qwen2511.py \
-  --image-root synthesis_pipeline/benchmark \
-  --instruction-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
-  --crop-dir synthesis_pipeline/benchmark/crops \
-  --results-full-dir synthesis_pipeline/results_qwen2511 \
+  --image-root benchmark \
+  --instruction-jsonl benchmark/annotations.jsonl \
+  --crop-dir benchmark/crops \
+  --results-full-dir results/qwen2511 \
   --patch-ratio 0.2
 ```
 
@@ -121,11 +121,11 @@ PF and Cons are computed using a local open-source Qwen model, while PQ is evalu
 ```
 # PF, Cons, PQ
 python metrics/EditScore/evaluation.py \
-  --annotations-jsonl synthesis_pipeline/benchmark/annotations.jsonl \
-  --crop-instruction-jsonl synthesis_pipeline/benchmark/crops/crop_instruction.jsonl \
-  --input-image-root synthesis_pipeline/benchmark \
-  --edited-image-root your_results \
-  --result-dir metrics/EditScore/runs/your_results \
+  --annotations-jsonl benchmark/annotations.jsonl \
+  --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
+  --input-image-root benchmark \
+  --edited-image-root results/your_results \
+  --result-dir metrics_results/LLM/your_results \
   --sc-model-name-or-path Qwen/Qwen3-VL-8B-Instruct \
   --pq-model-name-or-path gpt-4.1 \
   --pq-key YOUR_OPENAI_API_KEY \
@@ -138,11 +138,11 @@ Compute pixel-level similarity metrics:
 ```
 # MSE, LPIPS, PSNR...
 python metrics/traditional/evalaute_traditional.py \
-  --annotation_mapping_file synthesis_pipeline/benchmark/annotations.jsonl \
-  --src_image_folder synthesis_pipeline/benchmark \
-  --crop-instruction-jsonl synthesis_pipeline/benchmark/crops/crop_instruction.jsonl \
-  --tgt_method your_results \
-  --result_path metrics/traditional/metric_summary.csv \
+  --annotation_mapping_file benchmark/annotations.jsonl \
+  --src_image_folder benchmark \
+  --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
+  --tgt_method results/your_results \
+  --result_path metrics_results/traditional/metric_summary.csv \
 ```
 
 # Citation
