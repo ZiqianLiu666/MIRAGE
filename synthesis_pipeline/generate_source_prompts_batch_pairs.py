@@ -244,79 +244,88 @@ def collect_pair_pool(
     max_repeat_per_category: int,
     forbidden_window: int,
     topk_common_ban: int,
+    progress_desc: str = "pair_pool",
 ) -> List[dict]:
     collected: List[dict] = []
     pair_fail_streak = 0
     last_error = "NONE"
 
-    while len(collected) < target_count:
-        request_n = min(pair_batch_size, target_count - len(collected) + max(4, pair_batch_size // 3))
-        temp_pair = min(pair_temperature + 0.03 * pair_fail_streak, 0.96)
-        top_p_pair = min(pair_top_p + 0.01 * pair_fail_streak, 0.97)
+    with tqdm(total=target_count, desc=progress_desc, unit="pair") as pbar:
+        while len(collected) < target_count:
+            request_n = min(pair_batch_size, target_count - len(collected) + max(4, pair_batch_size // 3))
+            temp_pair = min(pair_temperature + 0.03 * pair_fail_streak, 0.96)
+            top_p_pair = min(pair_top_p + 0.01 * pair_fail_streak, 0.97)
 
-        prompt = pair_template
-        prompt = prompt.replace("{{REQUEST_N}}", str(request_n))
-        prompt = prompt.replace("{{COUNT_NUM}}", str(count_num))
-        prompt = prompt.replace("{{COUNT_WORD}}", count_word_value)
-        prompt = prompt.replace("{{NOVELTY_MODE}}", "strong" if pair_fail_streak == 0 else ("very strong" if pair_fail_streak <= 2 else "extreme"))
-        prompt = prompt.replace("{{FORBIDDEN_CATEGORIES}}", format_recent(sorted(used_categories), forbidden_window))
-        prompt = prompt.replace("{{FORBIDDEN_SCENES}}", format_recent(sorted(used_scenes), forbidden_window))
-        prompt = prompt.replace("{{TOP_CATEGORIES}}", format_top(cat_counter, topk_common_ban))
-        prompt = prompt.replace("{{TOP_SCENES}}", format_top(scene_counter, topk_common_ban))
-        prompt = prompt.replace("{{RECENT_PAIRS}}", format_recent_pairs(used_pairs, min(60, forbidden_window)))
-        prompt = prompt.replace("{{LAST_ERROR}}", last_error)
+            prompt = pair_template
+            prompt = prompt.replace("{{REQUEST_N}}", str(request_n))
+            prompt = prompt.replace("{{COUNT_NUM}}", str(count_num))
+            prompt = prompt.replace("{{COUNT_WORD}}", count_word_value)
+            prompt = prompt.replace("{{NOVELTY_MODE}}", "strong" if pair_fail_streak == 0 else ("very strong" if pair_fail_streak <= 2 else "extreme"))
+            prompt = prompt.replace("{{FORBIDDEN_CATEGORIES}}", format_recent(sorted(used_categories), forbidden_window))
+            prompt = prompt.replace("{{FORBIDDEN_SCENES}}", format_recent(sorted(used_scenes), forbidden_window))
+            prompt = prompt.replace("{{TOP_CATEGORIES}}", format_top(cat_counter, topk_common_ban))
+            prompt = prompt.replace("{{TOP_SCENES}}", format_top(scene_counter, topk_common_ban))
+            prompt = prompt.replace("{{RECENT_PAIRS}}", format_recent_pairs(used_pairs, min(60, forbidden_window)))
+            prompt = prompt.replace("{{LAST_ERROR}}", last_error)
 
-        raw = call_chat_once(
-            model_obj=model_obj,
-            tokenizer=tokenizer,
-            messages=[
-                {"role": "system", "content": "Output only the requested pair lines. No JSON, no markdown."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=temp_pair,
-            top_p=top_p_pair,
-            top_k=top_k,
-            max_tokens=max_tokens_pair,
-        )
+            raw = call_chat_once(
+                model_obj=model_obj,
+                tokenizer=tokenizer,
+                messages=[
+                    {"role": "system", "content": "Output only the requested pair lines. No JSON, no markdown."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=temp_pair,
+                top_p=top_p_pair,
+                top_k=top_k,
+                max_tokens=max_tokens_pair,
+            )
 
-        candidates = parse_pair_batch(raw)
-        accepted_this_round = 0
+            candidates = parse_pair_batch(raw)
+            accepted_this_round = 0
 
-        for pair in candidates:
-            if len(collected) >= target_count:
-                break
-            err = validate_pair_minimal(pair)
-            if err is not None:
-                last_error = err
-                continue
+            for pair in candidates:
+                if len(collected) >= target_count:
+                    break
+                err = validate_pair_minimal(pair)
+                if err is not None:
+                    last_error = err
+                    continue
 
-            cat = norm(pair["object_category"])
-            scene = norm(pair["scene"])
+                cat = norm(pair["object_category"])
+                scene = norm(pair["scene"])
 
-            if cat_counter[cat] >= max_repeat_per_category:
-                last_error = "category_repeat_cap"
-                continue
-            if (scene, cat) in used_pair_set:
-                last_error = "duplicate_pair"
-                continue
+                if cat_counter[cat] >= max_repeat_per_category:
+                    last_error = "category_repeat_cap"
+                    continue
+                if (scene, cat) in used_pair_set:
+                    last_error = "duplicate_pair"
+                    continue
 
-            used_pair_set.add((scene, cat))
-            used_pairs.append((scene, cat))
-            used_categories.add(cat)
-            used_scenes.add(scene)
-            cat_counter[cat] += 1
-            scene_counter[scene] += 1
+                used_pair_set.add((scene, cat))
+                used_pairs.append((scene, cat))
+                used_categories.add(cat)
+                used_scenes.add(scene)
+                cat_counter[cat] += 1
+                scene_counter[scene] += 1
 
-            collected.append({
-                "object_category": pair["object_category"].strip(),
-                "scene": pair["scene"].strip(),
-            })
-            accepted_this_round += 1
+                collected.append({
+                    "object_category": pair["object_category"].strip(),
+                    "scene": pair["scene"].strip(),
+                })
+                accepted_this_round += 1
 
-        if accepted_this_round == 0:
-            pair_fail_streak += 1
-        else:
-            pair_fail_streak = 0
+            if accepted_this_round == 0:
+                pair_fail_streak += 1
+            else:
+                pair_fail_streak = 0
+                pbar.update(accepted_this_round)
+
+            pbar.set_postfix_str(
+                f"accepted={len(collected)}/{target_count}, "
+                f"batch={len(candidates)}, fail_streak={pair_fail_streak}, last_error={last_error}"
+            )
+            pbar.refresh()
 
     return collected
 
@@ -399,6 +408,7 @@ def main():
         max_repeat_per_category=args.max_repeat_per_category,
         forbidden_window=args.forbidden_window,
         topk_common_ban=args.topk_common_ban,
+        progress_desc="pair_pool init",
     )
 
     produced = 0
@@ -429,6 +439,7 @@ def main():
                     max_repeat_per_category=args.max_repeat_per_category,
                     forbidden_window=args.forbidden_window,
                     topk_common_ban=args.topk_common_ban,
+                    progress_desc="pair_pool refill",
                 )
                 pair_pool.extend(extra_pairs)
 
