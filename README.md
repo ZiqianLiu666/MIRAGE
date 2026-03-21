@@ -134,7 +134,7 @@ python metrics/traditional/evalaute_traditional.py \
 ```
 
 # Citation
-If you use this code or the dataset in your research, please cite our paper:
+If you use this code or the benchmark in your research, please cite our paper:
 ```
 xxx
 ```
