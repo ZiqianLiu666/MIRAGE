@@ -148,17 +148,16 @@ def parse_args() -> argparse.Namespace:
         default="RefEdit-Bench",
     )
     parser.add_argument(
-        "--tgt_methods",
-        nargs="+",
+        "--tgt_method",
         type=str,
         required=True,
-        help="One or more folders that contain edited results.",
+        help="Folder containing edited results for one method.",
     )
     parser.add_argument(
         "--result_path",
         type=str,
-        default="metrics/traditional/table5_summary.csv",
-        help="Aggregated Table-5-style CSV output path.",
+        default="",
+        help="",
     )
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument(
@@ -184,9 +183,9 @@ def _mean(values: Sequence[float]) -> Optional[float]:
 
 def _append_summary(
     output_csv: str,
-    methods: Sequence[Tuple[str, str]],
+    method_key: str,
     summary_metrics: Sequence[Tuple[str, str]],
-    method_metric_values: Dict[Tuple[str, str], List[float]],
+    metric_values: Dict[str, List[float]],
 ) -> None:
     os.makedirs(os.path.dirname(output_csv) or ".", exist_ok=True)
 
@@ -197,18 +196,17 @@ def _append_summary(
         if write_header:
             writer.writerow(["split", "model", *[label for _, label in summary_metrics]])
 
-        for method_key, _ in methods:
-            row_values: List[Any] = ["all", method_key]
-            has_value = False
-            for metric_name, _ in summary_metrics:
-                avg = _mean(method_metric_values.get((method_key, metric_name), []))
-                if avg is None:
-                    row_values.append("")
-                else:
-                    row_values.append(f"{avg:.4f}")
-                    has_value = True
-            if has_value:
-                writer.writerow(row_values)
+        row_values: List[Any] = ["all", method_key]
+        has_value = False
+        for metric_name, _ in summary_metrics:
+            avg = _mean(metric_values.get(metric_name, []))
+            if avg is None:
+                row_values.append("")
+            else:
+                row_values.append(f"{avg:.4f}")
+                has_value = True
+        if has_value:
+            writer.writerow(row_values)
 
 
 def main() -> None:
@@ -216,10 +214,8 @@ def main() -> None:
     from matrics_calculator import MetricsCalculator
 
     annotations = load_annotations(args.annotation_mapping_file)
-    methods = [
-        (os.path.basename(os.path.normpath(method_path)), method_path)
-        for method_path in args.tgt_methods
-    ]
+    method_path = args.tgt_method
+    method_key = os.path.basename(os.path.normpath(method_path))
     crop_instruction_map = load_crop_instruction_map(args.crop_instruction_jsonl)
 
     metrics_calculator = MetricsCalculator(args.device)
@@ -233,7 +229,7 @@ def main() -> None:
         ("clip_similarity_target_image_edit_part", "CLIP Edited"),
     )
     metric_names = tuple(metric_name for metric_name, _ in summary_metrics)
-    method_metric_values: Dict[Tuple[str, str], List[float]] = defaultdict(list)
+    metric_values: Dict[str, List[float]] = defaultdict(list)
 
     per_image_context = nullcontext(None)
     if args.per_image_result_path:
@@ -246,11 +242,7 @@ def main() -> None:
         per_image_writer = None
         if per_image_file is not None:
             per_image_writer = csv.writer(per_image_file)
-            csv_head = []
-            for method_key, _ in methods:
-                for metric in metric_names:
-                    csv_head.append(f"{method_key}|{metric}")
-            per_image_writer.writerow(["file_id", "split", "editing_type"] + csv_head)
+            per_image_writer.writerow(["file_id", "split", "editing_type", *metric_names])
 
         for idx, ann in enumerate(annotations):
             file_id = ann["file_id"]
@@ -277,40 +269,39 @@ def main() -> None:
 
             row_values: List[Any] = [file_id, "all", editing_type]
 
-            for method_key, method_path in methods:
-                tgt_image_path = os.path.join(method_path, base_image_path)
-                tgt_image = Image.open(tgt_image_path)
+            tgt_image_path = os.path.join(method_path, base_image_path)
+            tgt_image = Image.open(tgt_image_path)
 
-                for metric in metric_names:
-                    if metric == "clip_similarity_target_image_edit_part":
-                        per_edit_scores: List[float] = []
-                        for edit_mask, edit_prompt in zip(edit_masks, edit_prompts):
-                            score = calculate_metric(
-                                metrics_calculator,
-                                metric,
-                                src_image,
-                                tgt_image,
-                                edit_mask,
-                                edit_mask,
-                                edit_prompt,
-                            )
-                            numeric_score = _finite_float_or_none(score)
-                            per_edit_scores.append(numeric_score)
-                        metric_score = _mean(per_edit_scores)
-                    else:
+            for metric in metric_names:
+                if metric == "clip_similarity_target_image_edit_part":
+                    per_edit_scores: List[float] = []
+                    for edit_mask, edit_prompt in zip(edit_masks, edit_prompts):
                         score = calculate_metric(
                             metrics_calculator,
                             metric,
                             src_image,
                             tgt_image,
-                            union_mask,
-                            union_mask,
-                            editing_prompt,
+                            edit_mask,
+                            edit_mask,
+                            edit_prompt,
                         )
-                        metric_score = _finite_float_or_none(score)
-                        
-                    row_values.append(metric_score)
-                    method_metric_values[(method_key, metric)].append(metric_score)
+                        numeric_score = _finite_float_or_none(score)
+                        per_edit_scores.append(numeric_score)
+                    metric_score = _mean(per_edit_scores)
+                else:
+                    score = calculate_metric(
+                        metrics_calculator,
+                        metric,
+                        src_image,
+                        tgt_image,
+                        union_mask,
+                        union_mask,
+                        editing_prompt,
+                    )
+                    metric_score = _finite_float_or_none(score)
+
+                row_values.append(metric_score)
+                metric_values[metric].append(metric_score)
 
             if per_image_writer is not None:
                 per_image_writer.writerow(row_values)
@@ -320,9 +311,9 @@ def main() -> None:
 
     _append_summary(
         output_csv=args.result_path,
-        methods=methods,
+        method_key=method_key,
         summary_metrics=summary_metrics,
-        method_metric_values=method_metric_values,
+        metric_values=metric_values,
     )
     print(f"Saved aggregated metrics to: {args.result_path}")
     if args.per_image_result_path:
