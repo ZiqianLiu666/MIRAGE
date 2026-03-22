@@ -47,7 +47,8 @@ python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
 ## 3.2 Image Generation (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python synthesis_pipeline/flux_t2i_generate.py \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
-  --results-dir benchmark
+  --results-dir benchmark \
+  --batch-size 2
 
 ## 3.3 Editing Instruction Generation
 python synthesis_pipeline/generate_instruction_refer.py \
