@@ -133,37 +133,50 @@ def locate_refer_object_batch(image_inputs, refer_objects):
     batch_messages = []
     for image_input, refer_object in zip(image_inputs, refer_objects):
         system_prompt = f"""
-You are a precise object detector for referring expressions.
+        You are a precise object detector for referring expressions.
 
-Task:
-Given one image and one referring phrase, output one tight bounding box for the target.
+        Task:
+        - You are given ONE image and ONE short phrase that describes ONE target.
+        - Find the SINGLE visible target region that the phrase refers to
+        and output its TIGHT bounding box.
 
-Part rule (critical):
-If the phrase has the form "X of Y" or "Y's X",
-the target to box is X (the PART), while Y is only used to identify which instance.
-Example: "glasses of the leftmost person" → box the glasses only, not the whole person.
+        What to localize:
+        - If the phrase has the form "X of Y" or "Y's X",
+        the target to box is X (the part), and Y is only used to find which instance.
+        Example: "glasses of the person on the leftmost" → box the glasses only, NOT the whole person.
+        Example: "shoes of the boy on the left" → box the shoes only.
+        - Otherwise, box the main noun described by the phrase.
 
-Disambiguation:
-If multiple similar objects exist, use spatial cues such as
-"leftmost", "rightmost", "middle", "center", "between A and B"
-to select exactly one instance.
+        Disambiguation:
+        - If multiple similar objects exist, use words like
+        "leftmost", "rightmost", "middle", "center",
+        "between A and B", "on the left/right", etc. to choose exactly one.
 
-Tightness:
-The box must tightly cover only the visible target with minimal padding.
-Do NOT include large surrounding regions (e.g. full body when target is glasses).
+        Tightness requirements:
+        - The box must tightly enclose only the visible target.
+        - Do NOT include large surrounding areas (e.g. full body when target is glasses).
+        - Keep minimal padding around the object.
 
-Coordinates:
-Use normalized coordinates in [0,1000].
-(0,0)=top-left, (1000,1000)=bottom-right.
-Output integers only.
+        Coordinate system:
+        - Use NORMALIZED coordinates in the range [0, 1000].
+        - 0 = left/top image edge, 1000 = right/bottom image edge.
+        - Output integers only.
+        - Do NOT output pixel coordinates or percentages.
 
-Output ONLY one JSON object:
-[
-{{"bbox_2d":[x_min,y_min,x_max,y_max],"label":"{refer_object}"}}
-]
+        Output:
+        - Return ONLY ONE valid JSON object and NOTHING ELSE.
+        - JSON format (must match EXACTLY):
+        [
+        {{"bbox_2d": [x_min, y_min, x_max, y_max], "label": "object"}}
+        ]
 
-Target phrase: {refer_object}
-""".strip()
+        STRICT JSON RULES:
+        - Use double quotes "..." around all keys and string values.
+        - Use colon ":" between keys and values.
+        - No trailing commas.
+
+        Target phrase: {refer_object}
+        """.strip()
 
         messages = [
             {
