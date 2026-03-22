@@ -132,7 +132,7 @@ def locate_refer_object_batch(image_inputs, refer_objects):
 
     batch_messages = []
     for image_input, refer_object in zip(image_inputs, refer_objects):
-        system_prompt = fuser_prompt = f"""
+        system_prompt = f"""
 You are a precise object detector for referring expressions.
 
 Task:
