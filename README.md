@@ -125,7 +125,7 @@ python metrics/EditScore/evaluation.py \
   --edited-image-root results/your_results \
   --result-dir metrics/results/LLM/your_results \
   --sc-model-name-or-path Qwen/Qwen3-VL-8B-Instruct \
-  --pq-model-name-or-path gpt-4.1 \
+  --pq-model-name-or-path gpt-5.1 \
   --pq-key YOUR_OPENAI_API_KEY \
   --num-pass 3
 ```
