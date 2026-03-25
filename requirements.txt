@@ -194,3 +194,4 @@ xformers==0.0.32.post1
 xgrammar==0.1.25
 yarl==1.23.0
 zipp==3.23.0
+datasets==4.8.4
