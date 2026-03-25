@@ -52,7 +52,7 @@ python quick_start.py \
 # 2. Automatic Image Synthesis Pipeline
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. 
 
-If you need, please run the following commands in sequence to obtain a complete synthesized dataset. Alternatively, you can directly download the benchmark from the link above and proceed to [4.2 Base model + MIRAGE](#42-base-model--mirage) for inference, skipping **Automatic Image Synthesis Pipeline**. 
+If you need, please run the following commands in sequence to obtain a complete synthesized dataset. Alternatively, you can directly download the benchmark from the link above and proceed to [3.2 Base model + MIRAGE](#32-base-model--mirage) for inference, skipping **Automatic Image Synthesis Pipeline**. 
 
 ```
 ## 2.1 Image Description Generation
