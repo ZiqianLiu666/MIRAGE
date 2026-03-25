@@ -38,11 +38,11 @@ To quickly try MIRAGE, you can run the following commands directly. The benchmar
 python quick_start.py \
   --model flux2_klein9b
 
-# FLUX.2 [Dev] + MIRAGE
+# FLUX.2 [Dev] + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python quick_start.py \
   --model flux2_dev
 
-# Qwen-Image-Edit-2511 + MIRAGE
+# Qwen-Image-Edit-2511 + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python quick_start.py \
   --model qwen2511
 ```
