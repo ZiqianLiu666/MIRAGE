@@ -31,13 +31,7 @@ Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Auto
 **Fig. 2: MIRAGE-bench sample examples.** The first row shows the synthesized original images, the second row presents the corresponding ground-truth (GT) masks of the target regions, and the third row displays the editing instructions constructed based on the generated image semantics and the source prompts.
 
 ## Quick Start
-
-```md
-## Quick Start
-
-To quickly try MIRAGE, you can run the following commands directly.  
-The benchmark will be loaded automatically from Hugging Face, so no manual download is required.  
-You can switch between different base models by modifying the `--model` argument.
+To quickly try MIRAGE, you can run the following commands directly. The benchmark will be loaded automatically from Hugging Face, so no manual download is required. You can switch between different base models by modifying the `--model` argument.
 
 ```bash
 # FLUX.2 [Klein]-9B + MIRAGE
