@@ -26,7 +26,7 @@ pip install -r requirements.txt
 ```
 
 Don't forget to log in to your Hugging Face account to get model access:
-```
+```bash
 echo 'export HF_TOKEN=xxx' >> ~/.bashrc
 source ~/.bashrc
 ```
@@ -59,7 +59,7 @@ We provide a fully automated pipeline for generating image with multiple similar
 
 Alternatively, you can directly download the benchmark from the [link](#benchmark-access) above and proceed to [Base model + MIRAGE](#32-base-model--mirage) for inference, or simply follow the [Quick Start](#quick-start) instructions above without running the **Automatic Image Synthesis Pipeline**.
 
-```
+```bash
 ## 2.1 Image Description Generation
 python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
   --pair-template synthesis_pipeline/prompt_template/image_description/prompt_pair_batch.txt \
@@ -96,7 +96,7 @@ We provide MIRAGE integration pipelines for multiple base image editing models.
 ## 3.1 Target Localization
 Before running inference, first obtain cropped regions corresponding to the target objects:
 
-```
+```bash
 python crop_image.py \
   --image-root benchmark \
   --instruction-jsonl benchmark/annotations.jsonl \
@@ -108,7 +108,7 @@ python crop_image.py \
 
 ## 3.2 Base model + MIRAGE
 Run MIRAGE on different base models:
-```
+```bash
 # FLUX.2[klein]-9B + MIRAGE
 python inference_mydemo_flux2_klein9B.py \
   --image-root benchmark \
@@ -118,7 +118,7 @@ python inference_mydemo_flux2_klein9B.py \
   --patch-ratio 0.2
 ```
 
-```
+```bash
 # Flux.2[Dev] + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python inference_mydemo_flux2_dev.py \
   --image-root benchmark \
@@ -128,7 +128,7 @@ python inference_mydemo_flux2_dev.py \
   --patch-ratio 0.2
 ```
 
-```
+```bash
 # Qwen-Image-Edit-2511 + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python inference_mydemo_qwen2511.py \
   --image-root benchmark \
@@ -141,7 +141,7 @@ python inference_mydemo_qwen2511.py \
 # 4. Evaluation
 ## LLM-based Metrics
 PF and Cons are computed using a local open-source Qwen model, while PQ is evaluated using the GPT API.
-```
+```bash
 # PF, Cons, PQ
 python metrics/EditScore/evaluation.py \
   --annotations-jsonl benchmark/annotations.jsonl \
@@ -158,7 +158,7 @@ python metrics/EditScore/evaluation.py \
 ## Traditional Metrics
 Compute pixel-level similarity metrics:
 
-```
+```bash
 # MSE, LPIPS, PSNR...
 python metrics/traditional/evalaute_traditional.py \
   --annotation_mapping_file benchmark/annotations.jsonl \
