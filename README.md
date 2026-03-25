@@ -12,7 +12,7 @@
 # Benchmark Access
 We release **MIRAGE-Bench**, which can be downloaded on [Huggingface](https://huggingface.co/datasets/ziqiangoodgood/MIRAGE) or [Google Drive](https://drive.google.com/file/d/1VK8Vu7Vdw35GWb7IapZLFSugoJTblTDx/view?usp=sharing) directly. The benchmark contains 100 samples, each consisting of an image, a composite editing instruction formed by combining five sub-instructions, and the corresponding ground-truth mask. This benchmark is designed to evaluate image editing models in more complex referring-expression scenarios. 
 
-Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Automatic Image Synthesis Pipeline**.
+Notably, the entire **MIRAGE-Bench** is constructed based on our proposed [2. Automatic Image Synthesis Pipeline](#2-Automatic-Image-Synthesis-Pipeline).
 
 ![benchmark](jpg/benchmark_example.jpg)
 **Fig. 2: MIRAGE-bench sample examples.** The first row shows the synthesized original images, the second row presents the corresponding ground-truth (GT) masks of the target regions, and the third row displays the editing instructions constructed based on the generated image semantics and the source prompts.
