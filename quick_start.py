@@ -1,11 +1,13 @@
 import argparse
 from pathlib import Path
+from huggingface_hub import snapshot_download
+import inference_mydemo_flux2_dev as flux2_dev
+import inference_mydemo_flux2_klein9B as flux2_klein9b
+import inference_mydemo_qwen2511 as qwen2511
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Run MIRAGE inference directly with the MIRAGE benchmark on Hugging Face."
-    )
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model",
         required=True,
@@ -79,8 +81,6 @@ def parse_args():
 
 
 def download_and_resolve_mirage_benchmark(dataset_id: str):
-    from huggingface_hub import snapshot_download
-
     snapshot_root = Path(
         snapshot_download(
             repo_id=dataset_id,
@@ -114,15 +114,7 @@ def download_and_resolve_mirage_benchmark(dataset_id: str):
         "crop_instruction_jsonl": crop_instruction_jsonl,
     }
 
-
-def resolve_results_dir(args):
-    if args.results_full_dir is not None:
-        return args.results_full_dir
-    return f"results/{args.model}"
-
-
 def run_flux2_dev(args, benchmark):
-    import inference_mydemo_flux2_dev as flux2_dev
 
     num_steps = 50 if args.num_steps is None else args.num_steps
     guidance_scale = 4.0 if args.guidance_scale is None else args.guidance_scale
@@ -141,7 +133,7 @@ def run_flux2_dev(args, benchmark):
         inst_map=inst_map,
         crop_map=crop_map,
         crop_dir=str(benchmark["crop_dir"]),
-        results_full_dir=resolve_results_dir(args),
+        results_full_dir=args.results_full_dir,
         num_inference_steps=num_steps,
         guidance_scale=guidance_scale,
         generator_device=args.device if str(args.device).startswith("cuda") else "cpu",
@@ -151,7 +143,6 @@ def run_flux2_dev(args, benchmark):
 
 
 def run_flux2_klein9b(args, benchmark):
-    import inference_mydemo_flux2_klein9B as flux2_klein9b
 
     num_steps = 50 if args.num_steps is None else args.num_steps
     guidance_scale = 4.0 if args.guidance_scale is None else args.guidance_scale
@@ -169,7 +160,7 @@ def run_flux2_klein9b(args, benchmark):
         inst_map=inst_map,
         crop_map=crop_map,
         crop_dir=str(benchmark["crop_dir"]),
-        results_full_dir=resolve_results_dir(args),
+        results_full_dir=args.results_full_dir,
         num_inference_steps=num_steps,
         guidance_scale=guidance_scale,
         generator_device=args.device if str(args.device).startswith("cuda") else "cpu",
@@ -179,7 +170,6 @@ def run_flux2_klein9b(args, benchmark):
 
 
 def run_qwen2511(args, benchmark):
-    import inference_mydemo_qwen2511 as qwen2511
 
     num_steps = 40 if args.num_steps is None else args.num_steps
     guidance_scale = 1.0 if args.guidance_scale is None else args.guidance_scale
@@ -200,7 +190,7 @@ def run_qwen2511(args, benchmark):
         inst_map=inst_map,
         crop_map=crop_map,
         crop_dir=str(benchmark["crop_dir"]),
-        results_full_dir=resolve_results_dir(args),
+        results_full_dir=args.results_full_dir,
         num_inference_steps=num_steps,
         true_cfg_scale=true_cfg_scale,
         guidance_scale=guidance_scale,
