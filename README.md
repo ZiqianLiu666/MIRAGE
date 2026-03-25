@@ -30,20 +30,24 @@ Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Auto
 ![benchmark](jpg/benchmark_example.jpg)
 **Fig. 2: MIRAGE-bench sample examples.** The first row shows the synthesized original images, the second row presents the corresponding ground-truth (GT) masks of the target regions, and the third row displays the editing instructions constructed based on the generated image semantics and the source prompts.
 
-# Quick Start
-如果你只想快速体验效果，你不需要在huggingface上手动下载，可以通过改变输入参数快速体验不同模型的效果。
-```
-# FLUX.2[klein]-9B + MIRAGE
-python quick_start.py \
-  --model flux2_klein9b
+## Quick Start
 
-# Flux.2[Dev] + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
-python quick_start.py \
-  --model flux2_dev
+```md
+## Quick Start
 
-# Qwen-Image-Edit-2511 + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
-python quick_start.py \
-  --model qwen2511
+To quickly try MIRAGE, you can run the following commands directly.  
+The benchmark will be loaded automatically from Hugging Face, so no manual download is required.  
+You can switch between different base models by modifying the `--model` argument.
+
+```bash
+# FLUX.2 [Klein]-9B + MIRAGE
+python quick_start.py --model flux2_klein9b
+
+# FLUX.2 [Dev] + MIRAGE
+python quick_start.py --model flux2_dev
+
+# Qwen-Image-Edit-2511 + MIRAGE
+python quick_start.py --model qwen2511
 ```
 
 # 3. Automatic Image Synthesis Pipeline
