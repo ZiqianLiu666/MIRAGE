@@ -34,7 +34,6 @@ source ~/.bashrc
 ## Quick Start
 To quickly try MIRAGE, you can run the following commands directly. The benchmark will be automatically downloaded from Hugging Face, so no manual setup is required.
 
-You can switch between different base models by modifying the `--model` argument.
 ```bash
 # FLUX.2 [klein]-9B + MIRAGE
 python quick_start.py \
