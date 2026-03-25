@@ -9,21 +9,7 @@
 ![overview](jpg/mybench_qualitative.jpg)
 **Fig. 1: Example images and instructions involving multiple similar instances and compositional edits.** Such scenarios are challenging for state-of-the-art models, which often introduce unintended modifications. In contrast, MIRAGE achieves precise instance-level editing while preserving background consistency.
 
-# 1. Requirements
-Install the required dependencies:
-```bash
-conda create -n mirage python=3.12 -y
-conda activate mirage
-pip install -r requirements.txt
-```
-
-Don't forget to log in to your Hugging Face account to get model access:
-```
-echo 'export HF_TOKEN=xxx' >> ~/.bashrc
-source ~/.bashrc
-```
-
-# 2. Benchmark Access
+# Benchmark Access
 We release **MIRAGE-Bench**, which can be downloaded on [Huggingface](https://huggingface.co/datasets/ziqiangoodgood/MIRAGE) or [Google Drive](https://drive.google.com/file/d/1VK8Vu7Vdw35GWb7IapZLFSugoJTblTDx/view?usp=sharing) directly. The benchmark contains 100 samples, each consisting of an image, a composite editing instruction formed by combining five sub-instructions, and the corresponding ground-truth mask. This benchmark is designed to evaluate image editing models in more complex referring-expression scenarios. 
 
 Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Automatic Image Synthesis Pipeline**.
@@ -49,13 +35,27 @@ python quick_start.py \
   --model qwen2511
 ```
 
-# 3. Automatic Image Synthesis Pipeline
+# 1. Requirements
+Install the required dependencies:
+```bash
+conda create -n mirage python=3.12 -y
+conda activate mirage
+pip install -r requirements.txt
+```
+
+Don't forget to log in to your Hugging Face account to get model access:
+```
+echo 'export HF_TOKEN=xxx' >> ~/.bashrc
+source ~/.bashrc
+```
+
+# 2. Automatic Image Synthesis Pipeline
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. 
 
 If you need, please run the following commands in sequence to obtain a complete synthesized dataset. Alternatively, you can directly download the benchmark from the link above and proceed to [4.2 Base model + MIRAGE](#42-base-model--mirage) for inference, skipping **Automatic Image Synthesis Pipeline**. 
 
 ```
-## 3.1 Image Description Generation
+## 2.1 Image Description Generation
 python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
   --pair-template synthesis_pipeline/prompt_template/image_description/prompt_pair_batch.txt \
   --generator-template synthesis_pipeline/prompt_template/image_description/prompt_draft_generator.txt \
@@ -63,13 +63,13 @@ python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
   --out synthesis_pipeline/source_prompts.jsonl \
   --num-samples 200
 
-## 3.2 Image Generation (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
+## 2.2 Image Generation (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python synthesis_pipeline/flux_t2i_generate.py \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
   --results-dir benchmark \
   --batch-size 2
 
-## 3.3 Editing Instruction Generation
+## 2.3 Editing Instruction Generation
 python synthesis_pipeline/generate_instruction_refer.py \
   --image-dir benchmark \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
@@ -78,17 +78,17 @@ python synthesis_pipeline/generate_instruction_refer.py \
   --generator-template synthesis_pipeline/prompt_template/instruction/instruction_generate.txt \
   --extractor-template synthesis_pipeline/prompt_template/instruction/refer_extract.txt
 
-## 3.4 Mask Generation
+## 2.4 Mask Generation
 python synthesis_pipeline/generate_bbox_mask.py \
   --image-dir benchmark \
   --jsonl benchmark/annotations.jsonl \
   --vis-dir benchmark/bbox_mask_vis
 ```
 
-# 4. Inference
+# 3. Inference
 We provide MIRAGE integration pipelines for multiple base image editing models.
 
-## 4.1 Target Localization
+## 3.1 Target Localization
 Before running inference, first obtain cropped regions corresponding to the target objects:
 
 ```
@@ -101,7 +101,7 @@ python crop_image.py \
   --padding 10
 ```
 
-## 4.2 Base model + MIRAGE
+## 3.2 Base model + MIRAGE
 Run MIRAGE on different base models:
 ```
 # FLUX.2[klein]-9B + MIRAGE
@@ -133,7 +133,7 @@ python inference_mydemo_qwen2511.py \
   --patch-ratio 0.2
 ```
 
-# 5. Evaluation
+# 4. Evaluation
 ## LLM-based Metrics
 PF and Cons are computed using a local open-source Qwen model, while PQ is evaluated using the GPT API.
 ```
