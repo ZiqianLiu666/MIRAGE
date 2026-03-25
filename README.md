@@ -22,6 +22,9 @@ echo 'export HF_TOKEN=xxx' >> ~/.bashrc
 source ~/.bashrc
 ```
 
+# Quick Start
+你不需要
+
 # 2. Benchmark Access
 We release **MIRAGE-Bench**, which can be downloaded on [Huggingface](https://huggingface.co/datasets/ziqiangoodgood/MIRAGE) or [Google Drive](https://drive.google.com/file/d/1VK8Vu7Vdw35GWb7IapZLFSugoJTblTDx/view?usp=sharing) directly. The benchmark contains 100 samples, each consisting of an image, a composite editing instruction formed by combining five sub-instructions, and the corresponding ground-truth mask. This benchmark is designed to evaluate image editing models in more complex referring-expression scenarios. 
 
