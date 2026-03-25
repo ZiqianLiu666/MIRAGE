@@ -35,13 +35,16 @@ To quickly try MIRAGE, you can run the following commands directly. The benchmar
 
 ```bash
 # FLUX.2 [Klein]-9B + MIRAGE
-python quick_start.py --model flux2_klein9b
+python quick_start.py \
+  --model flux2_klein9b
 
 # FLUX.2 [Dev] + MIRAGE
-python quick_start.py --model flux2_dev
+python quick_start.py \
+  --model flux2_dev
 
 # Qwen-Image-Edit-2511 + MIRAGE
-python quick_start.py --model qwen2511
+python quick_start.py \
+  --model qwen2511
 ```
 
 # 3. Automatic Image Synthesis Pipeline
