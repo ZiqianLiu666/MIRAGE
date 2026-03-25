@@ -17,7 +17,21 @@ Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Auto
 ![benchmark](jpg/benchmark_example.jpg)
 **Fig. 2: MIRAGE-bench sample examples.** The first row shows the synthesized original images, the second row presents the corresponding ground-truth (GT) masks of the target regions, and the third row displays the editing instructions constructed based on the generated image semantics and the source prompts.
 
-## Quick Start
+# 1. Requirements
+Install the required dependencies:
+```bash
+conda create -n mirage python=3.12 -y
+conda activate mirage
+pip install -r requirements.txt
+```
+
+Don't forget to log in to your Hugging Face account to get model access:
+```
+echo 'export HF_TOKEN=xxx' >> ~/.bashrc
+source ~/.bashrc
+```
+
+# Quick Start
 To quickly try MIRAGE, you can run the following commands directly. The benchmark will be automatically downloaded from Hugging Face, so no manual setup is required.
 
 You can switch between different base models by modifying the `--model` argument.
@@ -33,20 +47,6 @@ python quick_start.py \
 # Qwen-Image-Edit-2511 + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python quick_start.py \
   --model qwen2511
-```
-
-# 1. Requirements
-Install the required dependencies:
-```bash
-conda create -n mirage python=3.12 -y
-conda activate mirage
-pip install -r requirements.txt
-```
-
-Don't forget to log in to your Hugging Face account to get model access:
-```
-echo 'export HF_TOKEN=xxx' >> ~/.bashrc
-source ~/.bashrc
 ```
 
 # 2. Automatic Image Synthesis Pipeline
