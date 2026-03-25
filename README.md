@@ -2,6 +2,7 @@
 [Ziqian Liu](https://scholar.google.com/citations?view_op=list_works&hl=en&user=_1FGL3UAAAAJ) and [Stephan Alaniz*](https://scholar.google.com/citations?user=mzZa_yQAAAAJ&hl=en&oi=ao)
 
 [![arXiv](https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/xxxx.xxxxx)
+[![dataset](https://img.shields.io/badge/🤗%20Dataset-MIRAGE-yellow)](https://huggingface.co/datasets/ziqiangoodgood/MIRAGE)
 
 > **Abstract:** *Instruction-guided image editing has seen remarkable progress with models like FLUX.2 and Qwen-Image-Edit, yet they still struggle with complex scenarios involving multiple similar instances, each requiring individual edits. We observe that state-of-the-art models suffer from severe over-editing and spatial misalignment when faced with multiple identical instances and composite instructions. To address this, we introduce a comprehensive benchmark specifically designed to evaluate fine-grained consistency in multi-instance and multi-instruction settings. We further propose Multi-Instance Regional Alignment via Guided Editing (MIRAGE), a training-free framework for precise, localized editing. By leveraging a vision-language model to decompose complex instructions into region-specific subsets, MIRAGE employs a multi-branch parallel denoising strategy that injects target-region latents into the global representation while preserving background integrity through a reference trajectory. Extensive evaluations on MIRAGE-Bench and RefEdit-Bench demonstrate that our framework significantly outperforms existing methods in achieving precise instance-level modifications while maintaining strong background consistency.*
 
@@ -31,11 +32,9 @@ Notably, the entire **MIRAGE-Bench** is constructed based on our proposed **Auto
 **Fig. 2: MIRAGE-bench sample examples.** The first row shows the synthesized original images, the second row presents the corresponding ground-truth (GT) masks of the target regions, and the third row displays the editing instructions constructed based on the generated image semantics and the source prompts.
 
 ## Quick Start
-To quickly try MIRAGE, you can run the following commands directly.  
-The benchmark will be automatically downloaded from Hugging Face, so no manual setup is required.
+To quickly try MIRAGE, you can run the following commands directly. The benchmark will be automatically downloaded from Hugging Face, so no manual setup is required.
 
 You can switch between different base models by modifying the `--model` argument.
-
 ```bash
 # FLUX.2 [Klein]-9B + MIRAGE
 python quick_start.py \
