@@ -36,18 +36,23 @@ To quickly try MIRAGE, you can run the following commands directly. The benchmar
 
 You can switch between different base models by modifying the `--model` argument.
 ```bash
-# FLUX.2 [Klein]-9B + MIRAGE
+# FLUX.2 [klein]-9B + MIRAGE
 python quick_start.py \
-  --model flux2_klein9b
+  --model flux2_klein9b \
+  --results-full-dir results/flux2_klein9B \
+  --patch-ratio 0.2
 
 # FLUX.2 [Dev] + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python quick_start.py \
-  --model flux2_dev
+  --model flux2_dev \
+  --results-full-dir results/flux2_dev \
+  --patch-ratio 0.2
 
 # Qwen-Image-Edit-2511 + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
 python quick_start.py \
-  --model qwen2511
-```
+  --model qwen2511 \
+  --results-full-dir results/qwen2511 \
+  --patch-ratio 0.2
 
 # 2. Automatic Image Synthesis Pipeline
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. 
