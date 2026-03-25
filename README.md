@@ -102,8 +102,7 @@ python crop_image.py \
   --instruction-jsonl benchmark/annotations.jsonl \
   --output-dir benchmark/crops \
   --out-jsonl benchmark/crops/crop_instruction.jsonl \
-  --batch-size 2 \
-  --padding 10
+  --batch-size 2
 ```
 
 ## 3.2 Base model + MIRAGE
