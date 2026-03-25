@@ -53,6 +53,7 @@ python quick_start.py \
   --model qwen2511 \
   --results-full-dir results/qwen2511 \
   --patch-ratio 0.2
+```
 
 # 2. Automatic Image Synthesis Pipeline
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. 
