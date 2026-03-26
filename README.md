@@ -139,7 +139,7 @@ python inference_mydemo_qwen2511.py \
 
 # 4. Evaluation
 ## LLM-based Metrics
-PF and Cons are computed using a local open-source Qwen model, while PQ is evaluated using the GPT API.
+**PF** and **Cons** are computed using a local open-source Qwen model, while **PQ** is evaluated using the GPT API.
 ```bash
 # PF, Cons, PQ
 python metrics/EditScore/evaluation.py \
