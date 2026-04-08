@@ -1,5 +1,5 @@
 # MIRAGE: Benchmarking and Aligning Multi-Instance Image Editing
-[Ziqian Liu](https://scholar.google.com/citations?view_op=list_works&hl=en&user=_1FGL3UAAAAJ) and [Stephan Alaniz*](https://scholar.google.com/citations?user=mzZa_yQAAAAJ&hl=en&oi=ao)
+[Ziqian Liu](https://scholar.google.com/citations?view_op=list_works&hl=en&user=_1FGL3UAAAAJ) and [Stephan Alaniz](https://scholar.google.com/citations?user=mzZa_yQAAAAJ&hl=en&oi=ao)
 
 [![arXiv](https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2604.05180)
 [![dataset](https://img.shields.io/badge/🤗%20HuggingFace-Dataset-yellow)](https://huggingface.co/datasets/ziqiangoodgood/MIRAGE)
