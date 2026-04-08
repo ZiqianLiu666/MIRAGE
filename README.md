@@ -170,7 +170,15 @@ python metrics/traditional/evalaute_traditional.py \
 # Citation
 If you use this code or the benchmark in your research, please cite our paper:
 ```
-xxx
+@misc{liu2026miragebenchmarkingaligningmultiinstance,
+      title={MIRAGE: Benchmarking and Aligning Multi-Instance Image Editing}, 
+      author={Ziqian Liu and Stephan Alaniz},
+      year={2026},
+      eprint={2604.05180},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2604.05180}, 
+}
 ```
 
 
