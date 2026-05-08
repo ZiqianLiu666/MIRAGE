@@ -137,6 +137,37 @@ python inference_mydemo_qwen2511.py \
   --patch-ratio 0.2
 ```
 
+# 4. Evaluation
+## LLM-based Metrics
+**PF** and **Cons** are computed using a local open-source Qwen model, while **PQ** is evaluated using the GPT API.
+```bash
+# PF, Cons, PQ
+python metrics/EditScore/evaluation.py \
+  --annotations-jsonl benchmark/annotations.jsonl \
+  --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
+  --input-image-root benchmark \
+  --edited-image-root results/your_results \
+  --result-dir metrics/results/LLM/your_results \
+  --sc-model-name-or-path Qwen/Qwen3-VL-8B-Instruct \
+  --lora_path EditScore/EditScore-Qwen3-VL-8B-Instruct \
+  --pq-model-name-or-path gpt-5.1 \
+  --pq-key YOUR_OPENAI_API_KEY \
+  --num-pass 3
+```
+
+## Traditional Metrics
+Compute pixel-level similarity metrics:
+
+```bash
+# MSE, LPIPS, PSNR...
+python metrics/traditional/evalaute_traditional.py \
+  --annotation_mapping_file benchmark/annotations.jsonl \
+  --src_image_folder benchmark \
+  --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
+  --tgt_method results/your_results \
+  --result_path metrics/results/traditional/your_results/metric_summary.csv
+```
+
 # Citation
 If you use this code or the benchmark in your research, please cite our paper:
 ```
