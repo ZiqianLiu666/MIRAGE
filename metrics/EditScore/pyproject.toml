@@ -15,10 +15,9 @@ readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License", # 假设是 Apache 2.0
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
-# 这里列出 EditScore 核心库的依赖
 dependencies = [
     "torch",
     "torchvision",
@@ -35,5 +34,4 @@ Homepage = "https://github.com/VectorSpaceLab/EditScore"
 Issues = "https://github.com/VectorSpaceLab/EditScore/issues"
 
 [tool.setuptools.packages.find]
-# 自动发现名为 'editscore' 的包（即 editscore/ 目录）
 where = ["."]

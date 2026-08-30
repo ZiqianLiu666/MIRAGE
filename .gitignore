@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.env
+.DS_Store
+.vscode/
+.idea/
+**/results*/
+**/outputs/
+reports/
+tests/
+test_*.py
+*_test.py
+*.ckpt
+*.safetensors
+*.pt
+*.pth

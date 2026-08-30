@@ -1,12 +1,12 @@
 import argparse
-import os
 import json
+import os
 import time
 from collections import defaultdict
 
 import torch
-from diffusers.utils import load_image
 from diffusers import Flux2KleinPipeline
+from diffusers.utils import load_image
 
 from utils.runner_flux2_klein9B import run_flux2_multi_branch
 
@@ -40,13 +40,18 @@ def parse_args():
     parser.add_argument(
         "--crop-dir",
         default=None,
-        help="Folder containing crop images (must include crop_instruction.jsonl).",
+        help="Folder containing crop_instruction.jsonl.",
     )
 
     parser.add_argument(
         "--results-full-dir",
-        default="/home/infres/ziliu-24/instruct-pix2pix/results_mydemo_pad10",
+        default="results/flux2_klein9b",
         help="Output folder for full images.",
+    )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip an image when its output file already exists.",
     )
 
     parser.add_argument(
@@ -130,21 +135,16 @@ def load_flux2_klein_pipeline(
     return pipe
 
 
-def collect_crop_inputs(crop_dir: str, image_name: str, crop_records):
-    crop_images = []
+def collect_crop_inputs(crop_records):
     crop_prompts = []
     bboxes = []
     for rec in crop_records:
-        crop_filename = rec["image"]
-        crop_prompt = rec["new_instruction"]
-        bbox = rec["bbox"]
+        if rec.get("bbox") is None:
+            continue
+        crop_prompts.append(rec["new_instruction"])
+        bboxes.append(rec["bbox"])
 
-        crop_image_path = os.path.join(crop_dir, image_name, crop_filename)
-        crop_images.append(load_image(crop_image_path))
-        crop_prompts.append(crop_prompt)
-        bboxes.append(bbox)
-
-    return crop_images, crop_prompts, bboxes
+    return crop_prompts, bboxes
 
 
 def save_outputs(image_name: str, full_out, results_full_dir: str):
@@ -153,22 +153,29 @@ def save_outputs(image_name: str, full_out, results_full_dir: str):
     full_out.save(full_save_path)
 
 
-
 def run_inference_loop(
     pipe,
     image_names: list,
     image_root: str,
     inst_map: dict,
     crop_map: dict,
-    crop_dir: str,
     results_full_dir: str,
     num_inference_steps: int,
     guidance_scale: float,
     generator_device: str,
     seed: int,
     patch_ratio: float,
+    skip_existing: bool = False,
 ):
     for idx, img_name in enumerate(image_names):
+        output_path = os.path.join(results_full_dir, img_name)
+        if skip_existing and os.path.isfile(output_path):
+            print(
+                f"\n=== [{idx + 1}/{len(image_names)}] Skipping existing "
+                f"{img_name} ==="
+            )
+            continue
+
         if len(image_names) > 1:
             print(f"\n=== [{idx + 1}/{len(image_names)}] Processing {img_name} ===")
         else:
@@ -177,20 +184,30 @@ def run_inference_loop(
 
         full_image_path = os.path.join(image_root, img_name)
         full_prompt = inst_map[img_name]
-        crop_records = sorted(crop_map[img_name], key=lambda r: r.get("image", ""))
+        crop_records = sorted(
+            crop_map[img_name], key=lambda rec: str(rec.get("image") or "")
+        )
+
+        failed_records = [rec for rec in crop_records if rec.get("bbox") is None]
+        if failed_records:
+            failed_objects = ", ".join(
+                str(rec.get("refer_object") or "unknown object")
+                for rec in failed_records
+            )
+            print(
+                f"[Warning] {img_name}: skipping {len(failed_records)} "
+                f"localization record(s) without bbox: {failed_objects}"
+            )
 
         full_image = load_image(full_image_path)
 
-        crop_images, crop_prompts, bboxes = collect_crop_inputs(
-            crop_dir, img_name, crop_records
-        )
+        crop_prompts, bboxes = collect_crop_inputs(crop_records)
 
         generator = torch.Generator(device=generator_device).manual_seed(seed)
         infer_start = time.perf_counter()
         full_out = run_flux2_multi_branch(
             pipe=pipe,
             full_image=full_image,
-            crop_images=crop_images,
             full_prompt=full_prompt,
             crop_prompts=crop_prompts,
             bboxes=bboxes,
@@ -239,13 +256,13 @@ def main():
         image_root=image_root,
         inst_map=inst_map,
         crop_map=crop_map,
-        crop_dir=args.crop_dir,
         results_full_dir=args.results_full_dir,
         num_inference_steps=args.num_steps,
         guidance_scale=args.guidance_scale,
         generator_device=generator_device,
         seed=args.seed,
         patch_ratio=args.patch_ratio,
+        skip_existing=args.skip_existing,
     )
 
 

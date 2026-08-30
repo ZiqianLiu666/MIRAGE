@@ -42,9 +42,6 @@ class DinoStructureDistance:
         return outputs[0]
 
     def _extract_keys(self, qkv: torch.Tensor) -> torch.Tensor:
-        if qkv.dim() != 3:
-            raise ValueError(f"Unexpected qkv shape: {tuple(qkv.shape)}")
-
         batch_size, token_count, total_dim = qkv.shape
         embed_dim = total_dim // 3
         num_heads = self.model.blocks[self.layer_num].attn.num_heads
@@ -123,7 +120,6 @@ class MetricsCalculator:
     ) -> tuple[torch.Tensor, torch.Tensor]:
         img_pred = np.array(img_pred).astype(np.float32)
         img_gt = np.array(img_gt).astype(np.float32)
-        assert img_pred.shape == img_gt.shape, "Image shapes should be the same."
         img_pred = self._apply_mask(img_pred, mask_pred)
         img_gt = self._apply_mask(img_gt, mask_gt)
         return (

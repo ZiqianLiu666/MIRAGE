@@ -29,7 +29,7 @@
 
 ## 🔥 News
 - **2026-02-01**: Our work has been accepted to ICLR 2026 🎉
-- **2025-11-21**: We're excited to release the training configs for EditScore reward models! 🎯 Built on LLaMA-Factory, we trained EditScore ranging from 4B to 72B parameters with simple YAML configurations. Check out the [EditScore-train guide](examples/EditScore-train/README.md) to get started with training your own reward models.
+- **2025-11-21**: We're excited to release the training configs for EditScore reward models! 🎯 Built on LLaMA-Factory, we trained EditScore ranging from 4B to 72B parameters with simple YAML configurations. Check out the [EditScore-train guide](https://github.com/VectorSpaceLab/EditScore/tree/main/examples/EditScore-train) to get started with training your own reward models.
 - **2025-10-31**: We’re thrilled to announce the **Qwen3-VL** variants of **EditScore**! 🚀 Powered by Qwen3-VL, the new 4B and 8B models achieve outstanding efficiency and performance. Impressively, the 4B model already matches the performance of the original 32B version, while the 8B model delivers results comparable to the original 72B model. The models are now available on [huggingface](https://huggingface.co/EditScore/models), see [Usage Example](#-usage-example) for how to use. Detailed comparisons with Qwen2.5-VL variants are in the [performance table](https://raw.githubusercontent.com/VectorSpaceLab/EditScore/refs/heads/main/assets/table_editscore_qwen3_vl.png).
 - **2025-10-27**: Released [OmniGen2-EditScore7B-v1.1](https://huggingface.co/OmniGen2/OmniGen2-EditScore7B-v1.1), achieving a **7.01 (+0.73) GEdit score** within **700 steps**, by incorporating the **reweighting strategy** from [TempFlow](https://arxiv.org/abs/2508.04324). Additionally, the **JSON repair process** has been enhanced using [json_repair](https://github.com/mangiucugna/json_repair), improving **EditScore’s stability** under various conditions. Upgrade via `pip install -U editscore`.
 - **2025-10-22**: **Introducing Our Reinforcement Learning Training Framework!**
@@ -38,7 +38,7 @@
     - **An Easy-to-Use Reward Model**: Seamlessly integrate **EditScore** as a reward signal.
     - **A Scalable Reward Server**: Built with native multi-node support for high-throughput training.
     - **Flexible Training Code**: Supports distributed training, variable image resolutions and mixed tasks (t2i, edit, in-context generation) out-of-the-box.
-  Dive into our comprehensive guide on [RL Fine-Tuning](examples/OmniGen2-RL#application-2-reinforcement-fine-tuning) to get started.
+  Dive into our comprehensive guide on [RL Fine-Tuning](https://github.com/VectorSpaceLab/EditScore/tree/main/examples/OmniGen2-RL#application-2-reinforcement-fine-tuning) to get started.
 
 - 2025-10-16: Training datasets [EditScore-Reward-Data](https://huggingface.co/datasets/EditScore/EditScore-Reward-Data) and [EditScore-RL-Data](https://huggingface.co/datasets/EditScore/EditScore-RL-Data) are available.
 - 2025-10-15: **EditScore** is now available on PyPI — install it easily with `pip install editscore`.
@@ -200,7 +200,7 @@ We offer two example use cases for your exploration:
 - **Best-of-N selection**: Use EditScore to automatically pick the most preferred image among multiple candidates.
 - **Reinforcement fine-tuning**: Use EditScore as a reward model to guide RL-based optimization.
 
-For detailed instructions and examples, please refer to the [documentation](examples/OmniGen2-RL/README.md).
+For detailed instructions and examples, please refer to the [documentation](https://github.com/VectorSpaceLab/EditScore/tree/main/examples/OmniGen2-RL).
 
 ## ❤️ Citing Us
 If you find this repository or our work useful, please consider giving a star ⭐ and citation 🦖, which would be greatly appreciated:

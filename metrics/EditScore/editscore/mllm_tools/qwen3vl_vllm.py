@@ -2,9 +2,7 @@ from typing import Optional
 
 import os
 import hashlib
-import random
 import time
-import numpy as np
 import torch
 
 from vllm import LLM
@@ -16,29 +14,7 @@ from peft import PeftModel
 from qwen_vl_utils import process_vision_info
 
 
-def set_seed(seed: int):
-    """
-    Args:
-    Helper function for reproducible behavior to set the seed in `random`, `numpy`, `torch`.
-        seed (`int`): The seed to set.
-    """
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-
-def apply_chat_template(prompt, num_images: int = 2):
-    """
-    This is used since the bug of transformers which do not support vision id https://github.com/QwenLM/Qwen2.5-VL/issues/716#issuecomment-2723316100
-    """
-    template = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n"
-    template += "".join([f"<img{i}>: <|vision_start|><|image_pad|><|vision_end|>" for i in range(1, num_images + 1)])
-    template += f"{prompt}<|im_end|>\n<|im_start|>assistant\n"
-    return template
-
-
-class Qwen3VL():
+class Qwen3VL:
     def __init__(
         self,
         vlm_model,
@@ -53,7 +29,7 @@ class Qwen3VL():
     ) -> None:
         if lora_path:
             if cache_dir is None:
-                root_dir = torch.hub.get_dir() # default: ~/.cache/torch/hub
+                root_dir = torch.hub.get_dir()
 
                 lora_filename = os.path.splitext(os.path.basename(lora_path))[0]
                 lora_hash = hashlib.md5(lora_path.encode()).hexdigest()[:8]
@@ -93,7 +69,7 @@ class Qwen3VL():
         self.processor = AutoProcessor.from_pretrained(vlm_model)
         self.temperature = temperature
         self.seed = seed
-    
+
     def prepare_input(self, images, text_prompt: str = ""):
         if not isinstance(images, list):
             images = [images]
@@ -105,7 +81,6 @@ class Qwen3VL():
                 + [{"type": "text", "text": text_prompt}],
             }
         ]
-        # text = apply_chat_template(text_prompt, num_images=len(images))
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         image_inputs, _ = process_vision_info(messages)
 

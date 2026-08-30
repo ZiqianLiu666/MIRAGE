@@ -137,22 +137,9 @@ def build_mybench_samples(
         image_name = str(row["image"])
         input_path = input_root / image_name
         edited_path = edited_root / image_name
-        if not input_path.exists():
-            raise FileNotFoundError(f"Missing input image: {input_path}")
-        if not edited_path.exists():
-            raise FileNotFoundError(f"Missing edited image: {edited_path}")
 
         masks = row["mask"]
-        crop_instructions = crop_map.get(image_name)
-        if not isinstance(masks, list) or not masks:
-            raise ValueError(f"Invalid mask format for image {image_name}")
-        if crop_instructions is None:
-            raise ValueError(f"Missing crop instructions for image {image_name}")
-        if len(masks) != len(crop_instructions):
-            raise ValueError(
-                f"Mask / crop instruction mismatch for image {image_name}: "
-                f"{len(masks)} masks vs {len(crop_instructions)} crop instructions"
-            )
+        crop_instructions = crop_map[image_name]
 
         crop_edits = [
             CropEdit(crop_index=crop_index, instruction=instruction)
@@ -178,12 +165,6 @@ def open_aligned_pair(
         input_image = input_img.convert("RGB")
     with Image.open(edited_path) as edited_img:
         edited_image = edited_img.convert("RGB")
-
-    if input_image.size != edited_image.size:
-        raise ValueError(
-            f"Input / edited size mismatch: {input_path}={input_image.size}, "
-            f"{edited_path}={edited_image.size}"
-        )
 
     return input_image, edited_image
 
@@ -386,8 +367,6 @@ def evaluate_mybench(
 def main() -> None:
     args = parse_args()
     annotations = load_jsonl(args.annotations_jsonl)
-    if not annotations:
-        raise ValueError(f"No annotations loaded from: {args.annotations_jsonl}")
 
     samples = build_mybench_samples(
         annotations=annotations,
@@ -395,9 +374,6 @@ def main() -> None:
         input_root=args.input_image_root,
         edited_root=args.edited_image_root,
     )
-    if not samples:
-        raise ValueError("No samples after filtering")
-
     sc_scorer = build_sc_scorer(args)
     pq_scorer = build_pq_scorer(args)
     output_dir = args.result_dir

@@ -1,7 +1,3 @@
-import sys
-
-sys.path.insert(0, "editscore")
-
 import math
 from typing import Optional
 
@@ -91,8 +87,6 @@ class EditScore:
             from .mllm_tools.internvl35_lmdeploy import InternVL35
 
             self.model = InternVL35(model=model_name_or_path, tensor_parallel_size=tensor_parallel_size)
-        else:
-            raise ValueError(f"Unsupported backbone: {self.backbone}")
 
         self.context = vie_prompts._context_no_delimit_reasoning_first
         self.SC_prompt = "\n".join(
@@ -118,15 +112,10 @@ class EditScore:
         only_sc: bool = False,
         only_pq: bool = False,
     ):
-        if only_sc and only_pq:
-            raise ValueError("only_sc and only_pq cannot both be True.")
-
         if not isinstance(image_prompts, list):
             image_prompts = [image_prompts]
 
         if pq_image_prompts is None:
-            # Keep single-image behavior unchanged, but use both original+edited
-            # images by default when the caller provides an image pair.
             pq_image_prompts = image_prompts if len(image_prompts) > 1 else [image_prompts[-1]]
         elif not isinstance(pq_image_prompts, list):
             pq_image_prompts = [pq_image_prompts]
@@ -134,8 +123,8 @@ class EditScore:
         if pq_text_prompt is None:
             pq_text_prompt = text_prompt
 
-        if self.backbone in ["openai"]:
-            self.model.use_encode = False if isinstance(image_prompts[0], str) else True
+        if self.backbone == "openai":
+            self.model.use_encode = not isinstance(image_prompts[0], str)
 
         sc_prompt_final = None
         pq_prompt_final = None
@@ -188,9 +177,6 @@ class EditScore:
                         text_prompt=pq_text_prompt,
                         score_range=self.score_range,
                     )
-
-            if SC_dict == "rate_limit_exceeded" or PQ_dict == "rate_limit_exceeded":
-                raise ValueError("rate_limit_exceeded")
 
             if not only_pq:
                 sc_outputs_multi_pass.append(

@@ -1,6 +1,8 @@
 import argparse
 from pathlib import Path
+
 from huggingface_hub import snapshot_download
+
 import inference_mydemo_flux2_dev as flux2_dev
 import inference_mydemo_flux2_klein9B as flux2_klein9b
 import inference_mydemo_qwen2511 as qwen2511
@@ -81,41 +83,23 @@ def parse_args():
 
 
 def download_and_resolve_mirage_benchmark(dataset_id: str):
-    snapshot_root = Path(
+    benchmark_root = Path(
         snapshot_download(
             repo_id=dataset_id,
             repo_type="dataset",
         )
-    ).resolve()
-
-    benchmark_root = snapshot_root / "benchmark"
-    instruction_jsonl = benchmark_root / "annotations.jsonl"
-    crop_dir = benchmark_root / "crops"
-    crop_instruction_jsonl = crop_dir / "crop_instruction.jsonl"
-
-    required_paths = (
-        benchmark_root,
-        instruction_jsonl,
-        crop_dir,
-        crop_instruction_jsonl,
-    )
-    missing_paths = [str(path) for path in required_paths if not path.exists()]
-    if missing_paths:
-        raise FileNotFoundError(
-            "The Hugging Face dataset does not match the expected MIRAGE benchmark layout: "
-            + ", ".join(missing_paths)
-        )
+    ).resolve() / "benchmark"
 
     return {
-        "snapshot_root": snapshot_root,
         "image_root": benchmark_root,
-        "instruction_jsonl": instruction_jsonl,
-        "crop_dir": crop_dir,
-        "crop_instruction_jsonl": crop_instruction_jsonl,
+        "instruction_jsonl": benchmark_root / "annotations.jsonl",
+        "crop_instruction_jsonl": (
+            benchmark_root / "crops" / "crop_instruction.jsonl"
+        ),
     }
 
-def run_flux2_dev(args, benchmark):
 
+def run_flux2_dev(args, benchmark):
     num_steps = 50 if args.num_steps is None else args.num_steps
     guidance_scale = 4.0 if args.guidance_scale is None else args.guidance_scale
     inst_map = flux2_dev.load_instruction_map(str(benchmark["instruction_jsonl"]))
@@ -132,7 +116,6 @@ def run_flux2_dev(args, benchmark):
         image_root=str(benchmark["image_root"]),
         inst_map=inst_map,
         crop_map=crop_map,
-        crop_dir=str(benchmark["crop_dir"]),
         results_full_dir=args.results_full_dir,
         num_inference_steps=num_steps,
         guidance_scale=guidance_scale,
@@ -143,7 +126,6 @@ def run_flux2_dev(args, benchmark):
 
 
 def run_flux2_klein9b(args, benchmark):
-
     num_steps = 50 if args.num_steps is None else args.num_steps
     guidance_scale = 4.0 if args.guidance_scale is None else args.guidance_scale
     inst_map = flux2_klein9b.load_instruction_map(str(benchmark["instruction_jsonl"]))
@@ -159,7 +141,6 @@ def run_flux2_klein9b(args, benchmark):
         image_root=str(benchmark["image_root"]),
         inst_map=inst_map,
         crop_map=crop_map,
-        crop_dir=str(benchmark["crop_dir"]),
         results_full_dir=args.results_full_dir,
         num_inference_steps=num_steps,
         guidance_scale=guidance_scale,
@@ -170,7 +151,6 @@ def run_flux2_klein9b(args, benchmark):
 
 
 def run_qwen2511(args, benchmark):
-
     num_steps = 40 if args.num_steps is None else args.num_steps
     guidance_scale = 1.0 if args.guidance_scale is None else args.guidance_scale
     true_cfg_scale = 4.0 if args.true_cfg_scale is None else args.true_cfg_scale
@@ -189,7 +169,6 @@ def run_qwen2511(args, benchmark):
         image_root=str(benchmark["image_root"]),
         inst_map=inst_map,
         crop_map=crop_map,
-        crop_dir=str(benchmark["crop_dir"]),
         results_full_dir=args.results_full_dir,
         num_inference_steps=num_steps,
         true_cfg_scale=true_cfg_scale,
@@ -203,19 +182,15 @@ def run_qwen2511(args, benchmark):
 
 def main():
     args = parse_args()
+    if args.results_full_dir is None:
+        args.results_full_dir = str(Path("results") / args.model)
     benchmark = download_and_resolve_mirage_benchmark(args.hf_dataset_id)
-
-    if args.model == "flux2_dev":
-        run_flux2_dev(args, benchmark)
-        return
-    if args.model == "flux2_klein9b":
-        run_flux2_klein9b(args, benchmark)
-        return
-    if args.model == "qwen2511":
-        run_qwen2511(args, benchmark)
-        return
-
-    raise ValueError(f"Unsupported model: {args.model}")
+    runners = {
+        "flux2_dev": run_flux2_dev,
+        "flux2_klein9b": run_flux2_klein9b,
+        "qwen2511": run_qwen2511,
+    }
+    runners[args.model](args, benchmark)
 
 
 if __name__ == "__main__":

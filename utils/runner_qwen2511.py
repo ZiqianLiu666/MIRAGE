@@ -1,29 +1,41 @@
 import copy
-import math
-from collections import defaultdict
 from contextlib import nullcontext
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import PIL.Image
 import torch
-import torch.nn.functional as F
 from tqdm import tqdm
 
-
 from diffusers.pipelines.qwenimage.pipeline_qwenimage_edit_plus import (
+    CONDITION_IMAGE_SIZE,
+    VAE_IMAGE_SIZE,
+    calculate_dimensions,
     calculate_shift,
     retrieve_timesteps,
 )
 
-from diffusers.pipelines.qwenimage.pipeline_qwenimage_edit_plus import (
-        CONDITION_IMAGE_SIZE,
-        calculate_dimensions,
-    )
+from .geometry import (
+    add_noise_like,
+    aligned_crop,
+    bbox_to_latent_coords,
+    coerce_bbox,
+    min_size_latent_bbox,
+    region_write_weight,
+)
+from .composition import RegionComposer
 
-from .geometry import bbox_to_latent_coords, coerce_bbox
 
-from diffusers.utils.torch_utils import randn_tensor
+WRITE_MARGIN_CELLS = 2
+
+BOX_WRITE_WEIGHT = 1.0
+
+BRANCH_MAX_DOWNSCALE = 4.0
+
+BRANCH_CONTEXT_CELLS = 2
+
+MATCH_BASELINE_CANVAS = False
+
 
 def _get_device(pipe):
     if hasattr(pipe, "_execution_device") and pipe._execution_device is not None:
@@ -33,14 +45,23 @@ def _get_device(pipe):
     return pipe.transformer.device
 
 
-def _resolve_qwen_condition_size(image: PIL.Image.Image) -> Tuple[int, int]:
-    image_width, image_height = image.size
-    ratio = image_width / image_height
-    condition_width, condition_height = calculate_dimensions(CONDITION_IMAGE_SIZE, ratio)
-    return int(condition_width), int(condition_height)
+def _token_grid_hw(pipe, height: int, width: int) -> Tuple[int, int]:
+    multiple_of = pipe.vae_scale_factor * 2
+    return height // multiple_of, width // multiple_of
 
 
-def _prepare_branch_state(
+def _tokens_to_grid(tokens: torch.Tensor, latent_hw: Tuple[int, int]) -> torch.Tensor:
+    latent_h, latent_w = latent_hw
+    batch, token_count, channels = tokens.shape
+    return tokens.reshape(batch, latent_h, latent_w, channels).permute(0, 3, 1, 2)
+
+
+def _grid_to_tokens(grid: torch.Tensor) -> torch.Tensor:
+    batch, channels, height, width = grid.shape
+    return grid.permute(0, 2, 3, 1).reshape(batch, height * width, channels)
+
+
+def _prepare_state(
     pipe,
     image: PIL.Image.Image,
     prompt: str,
@@ -48,38 +69,34 @@ def _prepare_branch_state(
     do_true_cfg: bool,
     device: torch.device,
     latent_dtype: torch.dtype,
-    generator: Optional[torch.Generator],
+    target_area: float = VAE_IMAGE_SIZE,
 ):
     image = image.convert("RGB")
     image_w, image_h = image.size
-    image_ratio = image_w / image_h
 
-    # Official __call__ logic: default width/height are derived from ~1MP area,
-    # then snapped to vae_scale_factor * 2 multiples.
-    width, height = calculate_dimensions(1024 * 1024, image_ratio)
-    width = int(width)
-    height = int(height)
     multiple_of = pipe.vae_scale_factor * 2
-    width = width // multiple_of * multiple_of
-    height = height // multiple_of * multiple_of
+    if MATCH_BASELINE_CANVAS and image_w * image_h <= target_area:
+        width, height = image_w, image_h
+    else:
+        width, height = calculate_dimensions(target_area, image_w / image_h)
+    width = int(width) // multiple_of * multiple_of
+    height = int(height) // multiple_of * multiple_of
 
-    condition_w, condition_h = _resolve_qwen_condition_size(image)
-    condition_image = pipe.image_processor.resize(image, condition_h, condition_w)
+    condition_w, condition_h = calculate_dimensions(
+        target_area * (CONDITION_IMAGE_SIZE / VAE_IMAGE_SIZE), image_w / image_h
+    )
+    condition_image = pipe.image_processor.resize(
+        image, int(condition_h), int(condition_w)
+    )
 
-    # PR #12453 behavior: VAE path uses (width, height) directly.
     vae_tensor = pipe.image_processor.preprocess(image, height=height, width=width)
     if vae_tensor.ndim == 3:
         vae_tensor = vae_tensor.unsqueeze(0)
-    vae_tensor = vae_tensor.unsqueeze(2)
-    vae_tensor = vae_tensor.to(device=device, dtype=pipe.vae.dtype)
+    vae_tensor = vae_tensor.unsqueeze(2).to(device=device, dtype=pipe.vae.dtype)
 
     prompt_embeds, prompt_mask = pipe.encode_prompt(
-        image=[condition_image],
-        prompt=prompt,
-        device=device,
-        num_images_per_prompt=1,
+        image=[condition_image], prompt=prompt, device=device, num_images_per_prompt=1
     )
-    prompt_embeds = prompt_embeds.to(dtype=latent_dtype)
 
     negative_prompt_embeds = None
     negative_prompt_mask = None
@@ -92,121 +109,88 @@ def _prepare_branch_state(
         )
         negative_prompt_embeds = negative_prompt_embeds.to(dtype=latent_dtype)
 
-    latent_h = max(1, height // pipe.vae_scale_factor // 2)
-    latent_w = max(1, width // pipe.vae_scale_factor // 2)
-    img_shapes = [[(1, latent_h, latent_w), (1, latent_h, latent_w)]]
+    latent_h, latent_w = _token_grid_hw(pipe, height, width)
 
     return {
         "input_size": (image_w, image_h),
         "height": height,
         "width": width,
+        "latent_hw": (latent_h, latent_w),
         "vae_tensor": vae_tensor,
-        "prompt_embeds": prompt_embeds,
+        "prompt_embeds": prompt_embeds.to(dtype=latent_dtype),
         "prompt_mask": prompt_mask,
         "negative_prompt_embeds": negative_prompt_embeds,
         "negative_prompt_mask": negative_prompt_mask,
-        "img_shapes": img_shapes,
+        "img_shapes": [[(1, latent_h, latent_w), (1, latent_h, latent_w)]],
     }
 
 
-def _make_noise_like(latents: torch.Tensor, generator: Optional[torch.Generator]):
-    if generator is None:
-        return torch.randn_like(latents)
-    return randn_tensor(
-        latents.shape, generator=generator, device=latents.device, dtype=latents.dtype
-    )
-
-
-def _add_noise_like(
-    scheduler,
-    sample: torch.Tensor,
-    noise: torch.Tensor,
-    timestep: Union[int, float, torch.Tensor],
-):
-    if not isinstance(timestep, torch.Tensor):
-        timestep = torch.tensor(timestep, device=sample.device)
-    else:
-        timestep = timestep.to(sample.device)
-    if timestep.ndim == 0:
-        timestep = timestep.expand(sample.shape[0])
-    return scheduler.scale_noise(sample=sample, timestep=timestep, noise=noise)
-
-
-def _unpack_latents(pipe, latents: torch.Tensor, height: int, width: int):
-    return pipe._unpack_latents(latents, height, width, pipe.vae_scale_factor)
-
-
-def _pack_latents(pipe, latents: torch.Tensor):
-    return pipe._pack_latents(
-        latents,
-        latents.shape[0],
-        latents.shape[1],
-        latents.shape[3],
-        latents.shape[4],
-    )
-
-
-def _resize_latents(latents: torch.Tensor, target_h: int, target_w: int):
-    _, _, t, h, w = latents.shape
-    if h == target_h and w == target_w:
-        return latents
-    latents_4d = latents.reshape(latents.shape[0], latents.shape[1] * t, h, w)
-    latents_4d = F.interpolate(
-        latents_4d, size=(target_h, target_w), mode="bilinear", align_corners=False
-    )
-    return latents_4d.view(latents.shape[0], latents.shape[1], t, target_h, target_w)
-
-
-def _predict_noise(
+def _forward(
     pipe,
-    latent_model_input: torch.Tensor,
+    model_input: torch.Tensor,
+    token_count: int,
     timestep: torch.Tensor,
     guidance: Optional[torch.Tensor],
     prompt_embeds: torch.Tensor,
-    prompt_mask: Optional[torch.Tensor],
-    img_shapes: List[List[Tuple[int, int, int]]],
-    do_true_cfg: bool,
-    true_cfg_scale: float,
-    negative_prompt_embeds: Optional[torch.Tensor],
-    negative_prompt_mask: Optional[torch.Tensor],
-    latent_token_count: int,
+    prompt_mask: torch.Tensor,
+    img_shapes,
+    cache_name: str,
 ):
-    cond_context = (
-        pipe.transformer.cache_context("cond")
+    context = (
+        pipe.transformer.cache_context(cache_name)
         if hasattr(pipe.transformer, "cache_context")
         else nullcontext()
     )
-    with cond_context:
-        noise_pred = pipe.transformer(
-            hidden_states=latent_model_input,
+    with context:
+        return pipe.transformer(
+            hidden_states=model_input,
             timestep=timestep / 1000,
             guidance=guidance,
             encoder_hidden_states_mask=prompt_mask,
             encoder_hidden_states=prompt_embeds,
             img_shapes=img_shapes,
             return_dict=False,
-        )[0]
-    noise_pred = noise_pred[:, :latent_token_count]
+        )[0][:, :token_count]
 
+
+def _predict_noise(
+    pipe,
+    latents: torch.Tensor,
+    cond_latents: torch.Tensor,
+    timestep: torch.Tensor,
+    guidance: Optional[torch.Tensor],
+    state: Dict,
+    do_true_cfg: bool,
+    true_cfg_scale: float,
+):
+    model_input = torch.cat([latents, cond_latents], dim=1)
+    token_count = latents.shape[1]
+
+    noise_pred = _forward(
+        pipe,
+        model_input,
+        token_count,
+        timestep,
+        guidance,
+        state["prompt_embeds"],
+        state["prompt_mask"],
+        state["img_shapes"],
+        "cond",
+    )
     if not do_true_cfg:
         return noise_pred
 
-    uncond_context = (
-        pipe.transformer.cache_context("uncond")
-        if hasattr(pipe.transformer, "cache_context")
-        else nullcontext()
+    neg_noise_pred = _forward(
+        pipe,
+        model_input,
+        token_count,
+        timestep,
+        guidance,
+        state["negative_prompt_embeds"],
+        state["negative_prompt_mask"],
+        state["img_shapes"],
+        "uncond",
     )
-    with uncond_context:
-        neg_noise_pred = pipe.transformer(
-            hidden_states=latent_model_input,
-            timestep=timestep / 1000,
-            guidance=guidance,
-            encoder_hidden_states_mask=negative_prompt_mask,
-            encoder_hidden_states=negative_prompt_embeds,
-            img_shapes=img_shapes,
-            return_dict=False,
-        )[0]
-    neg_noise_pred = neg_noise_pred[:, :latent_token_count]
 
     comb_pred = neg_noise_pred + true_cfg_scale * (noise_pred - neg_noise_pred)
     cond_norm = torch.norm(noise_pred, dim=-1, keepdim=True)
@@ -214,50 +198,31 @@ def _predict_noise(
     return comb_pred * (cond_norm / noise_norm)
 
 
-def _group_crop_state_indices(crop_states: List[Dict[str, Any]]):
-    grouped = defaultdict(list)
-    for idx, state in enumerate(crop_states):
-        key = (
-            state["latents"].shape[1],
-            state["cond_latents"].shape[1],
-            state["height"],
-            state["width"],
-            tuple(state["prompt_embeds"].shape),
-            tuple(state["prompt_mask"].shape)
-            if state["prompt_mask"] is not None
-            else None,
+def _per_step_write_weight(effective: torch.Tensor, steps: int) -> torch.Tensor:
+    target = effective.to(torch.float32)
+    low = torch.zeros_like(target)
+    high = torch.ones_like(target)
+    for _ in range(60):
+        mid = 0.5 * (low + high)
+        survived = mid * (1.0 - mid.pow(steps)) / (
+            steps * (1.0 - mid).clamp(min=1e-12)
         )
-        grouped[key].append(idx)
-    return list(grouped.values())
-
-
-def _merge_batch_or_shared_tensors(tensors: List[Optional[torch.Tensor]]):
-    if not tensors:
-        return None
-    first = tensors[0]
-    if first is None:
-        return None
-
-    if first.ndim >= 1 and first.shape[0] == 1:
-        return torch.cat(tensors, dim=0)
-    return first
-
-
-def _merge_img_shapes(group_states: List[Dict[str, Any]]):
-    merged = []
-    for state in group_states:
-        merged.extend(state["img_shapes"])
-    return merged
+        below = survived < target
+        low = torch.where(below, mid, low)
+        high = torch.where(below, high, mid)
+    w = 0.5 * (low + high)
+    w = torch.where(target >= 1.0, torch.ones_like(w), w)
+    w = torch.where(target <= 0.0, torch.zeros_like(w), w)
+    return w.to(effective.dtype)
 
 
 @torch.no_grad()
 def run_qwen_multi_branch(
     pipe,
     full_image: PIL.Image.Image,
-    crop_images: List[PIL.Image.Image],
     full_prompt: str,
     crop_prompts: List[str],
-    bboxes: List[Optional[Union[Dict[str, int], Tuple[int, int, int, int], List[int]]]],
+    bboxes: List[Union[Dict[str, int], Tuple[int, int, int, int], List[int]]],
     num_inference_steps: int = 40,
     true_cfg_scale: float = 4.0,
     guidance_scale: Optional[float] = 1.0,
@@ -268,15 +233,13 @@ def run_qwen_multi_branch(
 
     device = _get_device(pipe)
     latent_dtype = pipe.transformer.dtype
-
-    has_neg_prompt = negative_prompt is not None
-    do_true_cfg = true_cfg_scale > 1.0 and has_neg_prompt
+    do_true_cfg = true_cfg_scale > 1.0 and negative_prompt is not None
 
     guidance = None
     if pipe.transformer.config.guidance_embeds:
         guidance = torch.full([1], guidance_scale, device=device, dtype=torch.float32)
 
-    full_state = _prepare_branch_state(
+    full_state = _prepare_state(
         pipe=pipe,
         image=full_image,
         prompt=full_prompt,
@@ -284,28 +247,12 @@ def run_qwen_multi_branch(
         do_true_cfg=do_true_cfg,
         device=device,
         latent_dtype=latent_dtype,
-        generator=generator,
     )
-
-    crop_states = []
-    for crop_image, crop_prompt in zip(crop_images, crop_prompts):
-        state = _prepare_branch_state(
-            pipe=pipe,
-            image=crop_image,
-            prompt=crop_prompt,
-            negative_prompt=negative_prompt,
-            do_true_cfg=do_true_cfg,
-            device=device,
-            latent_dtype=latent_dtype,
-            generator=generator,
-        )
-        crop_states.append(state)
-
-    full_scheduler = copy.deepcopy(pipe.scheduler)
-    crop_schedulers = [copy.deepcopy(pipe.scheduler) for _ in crop_states]
+    full_latent_hw = full_state["latent_hw"]
+    multiple_of = pipe.vae_scale_factor * 2
 
     num_channels_latents = pipe.transformer.config.in_channels // 4
-    full_latents, full_cond_latents = pipe.prepare_latents(
+    noise_full, full_cond_latents = pipe.prepare_latents(
         images=[full_state["vae_tensor"]],
         batch_size=1,
         num_channels_latents=num_channels_latents,
@@ -316,11 +263,63 @@ def run_qwen_multi_branch(
         generator=generator,
         latents=None,
     )
-    full_latents = full_latents.to(device=device, dtype=latent_dtype)
+    noise_full = noise_full.to(device=device, dtype=latent_dtype)
     full_state["cond_latents"] = full_cond_latents.to(device=device, dtype=latent_dtype)
 
-    for state in crop_states:
-        crop_latents, crop_cond_latents = pipe.prepare_latents(
+    noise_full_grid = _tokens_to_grid(noise_full, full_latent_hw)
+    full_image_grid = _tokens_to_grid(full_state["cond_latents"], full_latent_hw)
+    full_latents = noise_full
+
+    crop_states = []
+    for branch_id, (prompt, bbox) in enumerate(zip(crop_prompts, bboxes)):
+        latent_bbox = min_size_latent_bbox(
+            bbox_to_latent_coords(
+                coerce_bbox(bbox), full_state["input_size"], full_latent_hw
+            ),
+            (full_state["width"], full_state["height"]),
+            full_latent_hw,
+        )
+        y1_b, y2_b, x1_b, x2_b = latent_bbox
+        crop_bbox = (
+            max(0, y1_b - BRANCH_CONTEXT_CELLS),
+            min(full_latent_hw[0], y2_b + BRANCH_CONTEXT_CELLS),
+            max(0, x1_b - BRANCH_CONTEXT_CELLS),
+            min(full_latent_hw[1], x2_b + BRANCH_CONTEXT_CELLS),
+        )
+        state_offset = (y1_b - crop_bbox[0], x1_b - crop_bbox[2])
+
+        crop_image, _ = aligned_crop(
+            full_image,
+            (full_state["width"], full_state["height"]),
+            full_latent_hw,
+            crop_bbox,
+        )
+
+        box_pixels = (
+            (crop_bbox[1] - crop_bbox[0])
+            * (crop_bbox[3] - crop_bbox[2])
+            * (multiple_of * multiple_of)
+        )
+        target_area = min(
+            VAE_IMAGE_SIZE,
+            max(
+                box_pixels * BRANCH_MAX_DOWNSCALE * BRANCH_MAX_DOWNSCALE,
+                pipe.scheduler.config.get("base_image_seq_len", 256)
+                * multiple_of
+                * multiple_of,
+            ),
+        )
+        state = _prepare_state(
+            pipe=pipe,
+            image=crop_image,
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            do_true_cfg=do_true_cfg,
+            device=device,
+            latent_dtype=latent_dtype,
+            target_area=target_area,
+        )
+        branch_latents, branch_cond_latents = pipe.prepare_latents(
             images=[state["vae_tensor"]],
             batch_size=1,
             num_channels_latents=num_channels_latents,
@@ -331,217 +330,175 @@ def run_qwen_multi_branch(
             generator=generator,
             latents=None,
         )
-        state["latents"] = crop_latents.to(device=device, dtype=latent_dtype)
-        state["cond_latents"] = crop_cond_latents.to(device=device, dtype=latent_dtype)
+        state["latents"] = branch_latents.to(device=device, dtype=latent_dtype)
+        state["cond_latents"] = branch_cond_latents.to(
+            device=device, dtype=latent_dtype
+        )
+        state["latent_bbox"] = latent_bbox
+        state["crop_bbox"] = crop_bbox
+        state["state_offset"] = state_offset
+        state["branch_id"] = branch_id
+        state["scheduler"] = copy.deepcopy(pipe.scheduler)
+        crop_states.append(state)
 
+    full_scheduler = copy.deepcopy(pipe.scheduler)
     sigmas = np.linspace(1.0, 1 / num_inference_steps, num_inference_steps)
-    image_seq_len = full_latents.shape[1]
-    mu = calculate_shift(
-        image_seq_len,
-        full_scheduler.config.get("base_image_seq_len", 256),
-        full_scheduler.config.get("max_image_seq_len", 4096),
-        full_scheduler.config.get("base_shift", 0.5),
-        full_scheduler.config.get("max_shift", 1.15),
-    )
+
+    def shift_for(token_count: int) -> float:
+        return calculate_shift(
+            token_count,
+            full_scheduler.config.get("base_image_seq_len", 256),
+            full_scheduler.config.get("max_image_seq_len", 4096),
+            full_scheduler.config.get("base_shift", 0.5),
+            full_scheduler.config.get("max_shift", 1.15),
+        )
 
     timesteps, num_inference_steps = retrieve_timesteps(
-        full_scheduler,
-        num_inference_steps,
-        device,
-        sigmas=sigmas,
-        mu=mu,
+        full_scheduler, num_inference_steps, device, sigmas=sigmas, mu=shift_for(
+            full_latents.shape[1]
+        )
     )
-    for sch in crop_schedulers:
-        retrieve_timesteps(sch, num_inference_steps, device, sigmas=sigmas, mu=mu)
+    for state in crop_states:
+        retrieve_timesteps(
+            state["scheduler"],
+            num_inference_steps,
+            device,
+            sigmas=sigmas,
+            mu=shift_for(state["latents"].shape[1]),
+        )
+
     num_steps = len(timesteps)
-    patch_ratio = float(patch_ratio)
-    patch_ratio = max(0.0, min(patch_ratio, 1.0))
-    patch_until = int(num_steps * patch_ratio)
-
-    full_noise = _make_noise_like(full_state["cond_latents"], generator)
-
-    for i, state in enumerate(crop_states):
-        state["scheduler"] = crop_schedulers[i]
-        state["noise"] = _make_noise_like(state["cond_latents"], generator)
-
-    full_latents_img = _unpack_latents(
-        pipe,
-        full_state["cond_latents"],
-        full_state["height"],
-        full_state["width"],
-    )
-    full_latent_hw = (full_latents_img.shape[-2], full_latents_img.shape[-1])
-
-    for i, state in enumerate(crop_states):
-        latent_bbox = None
-        if bboxes[i] is not None:
-            latent_bbox = bbox_to_latent_coords(
-                coerce_bbox(bboxes[i]),
-                full_state["input_size"],
-                full_latent_hw,
-            )
-        state["latent_bbox"] = latent_bbox
-
-    any_bbox = any(state["latent_bbox"] is not None for state in crop_states)
+    patch_until = int(num_steps * max(0.0, min(float(patch_ratio), 1.0)))
+    handover_index = patch_until - 1
 
     if guidance is not None:
         guidance = guidance.expand(full_latents.shape[0])
 
+    def reference_at(next_timestep):
+        if next_timestep is None:
+            return full_image_grid.clone()
+        return add_noise_like(
+            full_scheduler, full_image_grid, noise_full_grid, next_timestep
+        )
+
+    write_weight = _per_step_write_weight(
+        region_write_weight(
+            full_latent_hw,
+            [state["latent_bbox"] for state in crop_states],
+            WRITE_MARGIN_CELLS,
+            device=full_image_grid.device,
+            dtype=full_image_grid.dtype,
+        ).clamp(max=BOX_WRITE_WEIGHT),
+        max(num_steps - patch_until, 1),
+    )
+
+    if handover_index >= 0:
+        print(
+            f"[handover] step {patch_until}/{num_steps}, "
+            f"sigma={float(full_scheduler.sigmas[patch_until]):.3f}, "
+            f"branch tokens {[st['latents'].shape[1] for st in crop_states]} "
+            f"vs canvas {full_latents.shape[1]}"
+        )
+    print(
+        f"[write region] boxes cover "
+        f"{float((write_weight >= BOX_WRITE_WEIGHT).float().mean()):.1%} of the "
+        f"canvas, collar adds "
+        f"{float(((write_weight > 0) & (write_weight < BOX_WRITE_WEIGHT)).float().mean()):.1%} "
+        f"at partial weight"
+    )
+
     for step_index, t in enumerate(
         tqdm(timesteps, desc="Diffusion steps", leave=False)
     ):
-        base_full = None
-        base_full_img = None
-        if any_bbox:
-            base_full = _add_noise_like(
-                full_scheduler, full_state["cond_latents"], full_noise, t
-            )
-            base_full_img = _unpack_latents(
-                pipe,
-                base_full,
-                full_state["height"],
-                full_state["width"],
-            )
-
+        next_t = timesteps[step_index + 1] if step_index + 1 < num_steps else None
         timestep = t.expand(full_latents.shape[0]).to(full_latents.dtype)
 
         if step_index < patch_until:
-            for group_indices in _group_crop_state_indices(crop_states):
-                group_states = [crop_states[i] for i in group_indices]
-                batch_sizes = [state["latents"].shape[0] for state in group_states]
+            composer = (
+                RegionComposer(reference_at(next_t))
+                if step_index == handover_index
+                else None
+            )
 
-                latents_batch = torch.cat(
-                    [state["latents"] for state in group_states], dim=0
+            for state in crop_states:
+                branch_timestep = t.expand(state["latents"].shape[0]).to(
+                    state["latents"].dtype
                 )
-                cond_latents_batch = torch.cat(
-                    [state["cond_latents"] for state in group_states], dim=0
-                )
-                crop_latent_model_input = torch.cat(
-                    [latents_batch, cond_latents_batch], dim=1
-                )
-
-                timestep_batch = t.expand(latents_batch.shape[0]).to(
-                    latents_batch.dtype
-                )
-                guidance_batch = (
-                    guidance.expand(latents_batch.shape[0])
-                    if guidance is not None
-                    else None
-                )
-                prompt_embeds_batch = torch.cat(
-                    [state["prompt_embeds"] for state in group_states], dim=0
-                )
-                prompt_mask_batch = _merge_batch_or_shared_tensors(
-                    [state["prompt_mask"] for state in group_states]
-                )
-                img_shapes_batch = _merge_img_shapes(group_states)
-
-                negative_prompt_embeds_batch = None
-                negative_prompt_mask_batch = None
-                if do_true_cfg:
-                    negative_prompt_embeds_batch = _merge_batch_or_shared_tensors(
-                        [state["negative_prompt_embeds"] for state in group_states]
-                    )
-                    negative_prompt_mask_batch = _merge_batch_or_shared_tensors(
-                        [state["negative_prompt_mask"] for state in group_states]
-                    )
-
-                noise_pred_crop_batch = _predict_noise(
+                noise_pred = _predict_noise(
                     pipe=pipe,
-                    latent_model_input=crop_latent_model_input,
-                    timestep=timestep_batch,
-                    guidance=guidance_batch,
-                    prompt_embeds=prompt_embeds_batch,
-                    prompt_mask=prompt_mask_batch,
-                    img_shapes=img_shapes_batch,
+                    latents=state["latents"],
+                    cond_latents=state["cond_latents"],
+                    timestep=branch_timestep,
+                    guidance=guidance,
+                    state=state,
                     do_true_cfg=do_true_cfg,
                     true_cfg_scale=true_cfg_scale,
-                    negative_prompt_embeds=negative_prompt_embeds_batch,
-                    negative_prompt_mask=negative_prompt_mask_batch,
-                    latent_token_count=latents_batch.size(1),
                 )
 
-                start = 0
-                for state, local_bs in zip(group_states, batch_sizes):
-                    end = start + local_bs
-                    noise_pred_crop = noise_pred_crop_batch[start:end]
-                    start = end
-
-                    crop_latents_dtype = state["latents"].dtype
+                if composer is None:
                     state["latents"] = state["scheduler"].step(
-                        noise_pred_crop, t, state["latents"], return_dict=False
-                    )[0]
-                    if state["latents"].dtype != crop_latents_dtype:
-                        state["latents"] = state["latents"].to(crop_latents_dtype)
+                        noise_pred, t, state["latents"], return_dict=False
+                    )[0].to(latent_dtype)
+                    continue
 
-                    if state["latent_bbox"] is not None:
-                        y1_l, y2_l, x1_l, x2_l = state["latent_bbox"]
-                        crop_latents_img = _unpack_latents(
-                            pipe,
-                            state["latents"],
-                            state["height"],
-                            state["width"],
-                        )
-                        target_h = y2_l - y1_l
-                        target_w = x2_l - x1_l
-                        crop_latents_img = _resize_latents(
-                            crop_latents_img, target_h, target_w
-                        )
-                        base_full_img[:, :, :, y1_l:y2_l, x1_l:x2_l] = crop_latents_img
+                sigma = state["scheduler"].sigmas[step_index].to(latent_dtype)
+                clean = state["latents"] - sigma * noise_pred
 
-            if any_bbox:
-                full_latents = _pack_latents(pipe, base_full_img)
+                y1_l, y2_l, x1_l, x2_l = state["latent_bbox"]
+                cy1, cy2, cx1, cx2 = state["crop_bbox"]
+                oy, ox = state["state_offset"]
+                clean_crop = torch.nn.functional.adaptive_avg_pool2d(
+                    _tokens_to_grid(clean, state["latent_hw"]).float(),
+                    (cy2 - cy1, cx2 - cx1),
+                ).to(latent_dtype)
+                clean_box = clean_crop[
+                    ..., oy : oy + (y2_l - y1_l), ox : ox + (x2_l - x1_l)
+                ].contiguous()
+
+                window_reference = full_image_grid[..., y1_l:y2_l, x1_l:x2_l]
+                branch_z = (
+                    clean_box
+                    if next_t is None
+                    else add_noise_like(
+                        full_scheduler,
+                        clean_box,
+                        noise_full_grid[..., y1_l:y2_l, x1_l:x2_l],
+                        next_t,
+                    )
+                )
+                composer.add(
+                    branch_z,
+                    state["latent_bbox"],
+                    clean_box - window_reference,
+                    state["branch_id"],
+                )
+
+            if composer is not None:
+                full_latents = _grid_to_tokens(composer.compose())
 
         else:
-            full_latent_model_input = torch.cat(
-                [full_latents, full_state["cond_latents"]], dim=1
-            )
-            noise_pred_full = _predict_noise(
+            noise_pred = _predict_noise(
                 pipe=pipe,
-                latent_model_input=full_latent_model_input,
+                latents=full_latents,
+                cond_latents=full_state["cond_latents"],
                 timestep=timestep,
                 guidance=guidance,
-                prompt_embeds=full_state["prompt_embeds"],
-                prompt_mask=full_state["prompt_mask"],
-                img_shapes=full_state["img_shapes"],
+                state=full_state,
                 do_true_cfg=do_true_cfg,
                 true_cfg_scale=true_cfg_scale,
-                negative_prompt_embeds=full_state["negative_prompt_embeds"],
-                negative_prompt_mask=full_state["negative_prompt_mask"],
-                latent_token_count=full_latents.size(1),
             )
-
-            full_latents_dtype = full_latents.dtype
             full_latents = full_scheduler.step(
-                noise_pred_full, t, full_latents, return_dict=False
-            )[0]
-            if full_latents.dtype != full_latents_dtype:
-                full_latents = full_latents.to(full_latents_dtype)
+                noise_pred, t, full_latents, return_dict=False
+            )[0].to(latent_dtype)
 
-            if any_bbox:
-                full_latents_img = _unpack_latents(
-                    pipe,
-                    full_latents,
-                    full_state["height"],
-                    full_state["width"],
-                )
-                base = base_full_img
-                for state in crop_states:
-                    if state["latent_bbox"] is None:
-                        continue
-                    y1_l, y2_l, x1_l, x2_l = state["latent_bbox"]
-                    base[:, :, :, y1_l:y2_l, x1_l:x2_l] = full_latents_img[
-                        :, :, :, y1_l:y2_l, x1_l:x2_l
-                    ]
-                full_latents = _pack_latents(pipe, base)
+            canvas = reference_at(next_t)
+            denoised = _tokens_to_grid(full_latents, full_latent_hw)
+            canvas = canvas + write_weight * (denoised.to(canvas.dtype) - canvas)
+            full_latents = _grid_to_tokens(canvas)
 
-    latents = _unpack_latents(
-        pipe,
-        full_latents,
-        full_state["height"],
-        full_state["width"],
-    )
-    latents = latents.to(pipe.vae.dtype)
+    latents = pipe._unpack_latents(
+        full_latents, full_state["height"], full_state["width"], pipe.vae_scale_factor
+    ).to(pipe.vae.dtype)
 
     latents_mean = (
         torch.tensor(pipe.vae.config.latents_mean)
@@ -554,5 +511,4 @@ def run_qwen_multi_branch(
     latents = latents / latents_std + latents_mean
 
     image = pipe.vae.decode(latents, return_dict=False)[0][:, :, 0]
-    image = pipe.image_processor.postprocess(image, output_type="pil")[0]
-    return image
+    return pipe.image_processor.postprocess(image, output_type="pil")[0]

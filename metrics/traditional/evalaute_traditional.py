@@ -74,10 +74,16 @@ def load_annotations(path: str) -> List[Dict[str, Any]]:
     return entries
 
 
-def mask_decode(encoded_mask: List[Any], image_size: Tuple[int, int]) -> np.ndarray:
+def mask_decode(
+    encoded_mask: List[Any],
+    image_size: Tuple[int, int],
+    target_size: Optional[Tuple[int, int]] = None,
+) -> np.ndarray:
     new_mask = Image.new("L", image_size, 0)
     new_draw = ImageDraw.Draw(new_mask)
     new_draw.polygon(encoded_mask, outline=1, fill=1)
+    if target_size is not None and tuple(target_size) != tuple(image_size):
+        new_mask = new_mask.resize(tuple(target_size), Image.Resampling.NEAREST)
     return np.array(new_mask)
 
 
@@ -128,7 +134,7 @@ def calculate_metric(
             tgt_image, tgt_prompt, tgt_mask
         )
 
-    raise ValueError(f"Unsupported metric: {metric}")
+    return image_metric_fns[metric](src_image, tgt_image, src_mask, tgt_mask)
 
 
 def parse_args() -> argparse.Namespace:
@@ -229,21 +235,21 @@ def main() -> None:
         editing_prompt = ann["editing_prompt"]
         image_name = ann["image_name"]
 
+        tgt_image_path = os.path.join(method_path, base_image_path)
+        tgt_image = Image.open(tgt_image_path)
+
         edit_masks: List[np.ndarray] = []
         edit_prompts: List[str] = []
         polygons = normalize_polygons(ann["mask_raw"])
         crop_items = crop_instruction_map.get(image_name)
 
-        for edit_idx, (poly, crop_item) in enumerate(zip(polygons, crop_items)):
+        for poly, crop_item in zip(polygons, crop_items):
             edit_prompt = crop_item["new_instruction"].strip()
-            edit_mask = mask_decode(poly, src_image.size)
+            edit_mask = mask_decode(poly, src_image.size, tgt_image.size)
             edit_masks.append(edit_mask[:, :, np.newaxis].repeat(3, axis=2))
             edit_prompts.append(edit_prompt)
 
         union_mask = np.maximum.reduce(np.stack(edit_masks, axis=0))
-
-        tgt_image_path = os.path.join(method_path, base_image_path)
-        tgt_image = Image.open(tgt_image_path)
 
         for metric in metric_names:
             if metric == "clip_similarity_target_image_edit_part":
