@@ -35,7 +35,6 @@ def load_samples(annotations_jsonl, crop_instruction_jsonl):
 
 
 def polygon_mask(mask, size):
-    """Binary mask of one polygon [x1, y1, x2, y2, ...] or a list of such polygons."""
     polygons = mask if isinstance(mask[0], list) else [mask]
     canvas = Image.new("L", size, 0)
     draw = ImageDraw.Draw(canvas)
@@ -59,7 +58,6 @@ def project_mask(mask, size, policy):
 
 
 def masked_pair(source, edited, mask, policy):
-    """Source and edited images with everything outside the edit mask set to black."""
     source_mask = Image.fromarray(polygon_mask(mask, source.size).astype(np.uint8))
     edited_mask = project_mask(source_mask, edited.size, policy)
     return (

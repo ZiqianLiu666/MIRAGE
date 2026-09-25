@@ -54,7 +54,7 @@ If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-of
 `--patch-ratio` is the fraction of the denoising steps handled by the region branches, i.e. 1 - ρ in the paper. The default of 0.4 is the setting we use on MIRAGE-Bench; for single-instruction benchmarks such as RefEdit-Bench we use 0.2.
 
 # 2. Automatic Image Synthesis Pipeline
-We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. If you need, please run the following commands in sequence to obtain a complete synthesized dataset.
+We provide a fully automated pipeline for generating images with multiple similar instances and composite editing instructions. If you need, please run the following commands in sequence to obtain a complete synthesized dataset.
 
 Alternatively, you can directly download the benchmark from the [link](#benchmark-access) above and proceed to [Base model + MIRAGE](#32-base-model--mirage) for inference, or simply follow the [Quick Start](#quick-start) instructions above without running the **Automatic Image Synthesis Pipeline**.
 
@@ -116,10 +116,10 @@ python inference.py \
 ```
 
 # 4. Evaluation
-All evaluators take the edited images of one method and compare them with the benchmark images. Use `--mask-alignment-policy full-frame` for MIRAGE outputs and `flux2-crop` for outputs of the official FLUX.2 pipelines. The OpenAI judges read the API key from `OPENAI_API_KEY`.
+Use `--mask-alignment-policy full-frame` for MIRAGE outputs and `flux2-crop` for outputs of the official FLUX.2 pipelines. The OpenAI judges read the API key from `OPENAI_API_KEY`.
 
 ## LLM-based Metrics
-**PF**, **Cons** and **PQ** judged by OpenAI models:
+**PF**, **Cons** and **PQ** are all judged by GPT models:
 ```bash
 python metrics/evaluate_gpt.py \
   --annotations-jsonl benchmark/annotations.jsonl \
@@ -130,7 +130,7 @@ python metrics/evaluate_gpt.py \
   --mask-alignment-policy full-frame
 ```
 
-**PF** and **Cons** computed with a local EditScore model, while **PQ** is evaluated using the GPT API. The EditScore judge runs on [vLLM](https://github.com/vllm-project/vllm) by default (we used `vllm==0.11.0`); pass `--sc-backbone qwen3vl` to run it with Transformers instead.
+Alternatively, **PF** and **Cons** can be computed with a local EditScore model, while **PQ** is still evaluated with the GPT API. The EditScore judge runs on [vLLM](https://github.com/vllm-project/vllm) by default (we used `vllm==0.11.0`); pass `--sc-backbone qwen3vl` to run it with Transformers instead.
 ```bash
 python metrics/evaluate_editscore.py \
   --annotations-jsonl benchmark/annotations.jsonl \

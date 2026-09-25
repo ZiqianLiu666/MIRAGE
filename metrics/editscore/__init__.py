@@ -8,7 +8,6 @@ from .prompts import CONTEXT, EDIT_RULE, PQ_RULE, SC_RULE
 
 
 def parse_output(text):
-    """Scores and reasoning from a '{"reasoning": ..., "score": [...]}' response."""
     data = json.loads(text[text.index("{") : text.rindex("}") + 1])
     return [float(s) for s in data["score"]], data["reasoning"]
 
@@ -38,7 +37,6 @@ class EditScore:
         return [parse_output(self.model.inference(inputs, seed=self.seed + i)) for i in range(self.num_pass)]
 
     def score_sc(self, images, instruction):
-        """Prompt following and consistency averaged over passes, plus the last reasoning."""
         passes = self._run(images, self.sc_prompt.replace("<instruction>", instruction))
         prompt_following = np.mean([scores[0] / self.scale for scores, _ in passes])
         consistency = np.mean([scores[1] / self.scale for scores, _ in passes])

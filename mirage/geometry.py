@@ -7,7 +7,6 @@ MIN_CROP_SIZE = 64
 
 
 def bbox_to_latent(bbox, image_size, latent_hw):
-    """Latent cells (y1, y2, x1, x2) covered by a pixel bbox."""
     x1, y1, x2, y2 = (int(bbox[k]) for k in ("x1", "y1", "x2", "y2"))
     width, height = image_size
     latent_h, latent_w = latent_hw
@@ -19,7 +18,6 @@ def bbox_to_latent(bbox, image_size, latent_hw):
 
 
 def grow(lo, hi, size, limit):
-    """Widen [lo, hi) to at least `size` around its center, staying inside [0, limit)."""
     if hi - lo >= size:
         return lo, hi
     extra = size - (hi - lo)
@@ -45,7 +43,6 @@ def min_size_box(box, image_size, latent_hw):
 
 
 def crop_cells(image, image_size, latent_hw, box):
-    """Crop the pixels under the latent cells `box` of the image resized to `image_size`."""
     width, height = image_size
     stride_y, stride_x = height // latent_hw[0], width // latent_hw[1]
     y1, y2, x1, x2 = box

@@ -31,7 +31,6 @@ def _json_items(text):
 
 
 def _box(values, yx=False):
-    """Normalized [x1, y1, x2, y2] box in [0, 1000] from raw model coordinates."""
     a, b, c, d = (float(v) for v in values)
     x1, y1, x2, y2 = (b, a, d, c) if yx else (a, b, c, d)
     return [
@@ -43,7 +42,6 @@ def _box(values, yx=False):
 
 
 def to_pixels(box, size, padding=0, min_size=1):
-    """Pixel box (x1, y1, x2, y2) of a normalized box, padded and clipped to the image."""
     width, height = size
     x1, y1, x2, y2 = (
         int(round(max(0.0, min(v, 1000.0)) / 1000.0 * total)) for v, total in zip(box, (width, height, width, height))
@@ -194,8 +192,6 @@ def _qwen35_locate_prompt(refer_object, mode):
 
 
 class VLM:
-    """Chat VLM that parses edit instructions and grounds referring expressions."""
-
     model_cls = AutoModelForMultimodalLM
     template_kwargs = {"enable_thinking": False}
     grounding_tokens = 128
@@ -239,7 +235,6 @@ class VLM:
         ]
 
     def ground(self, images, phrases, mode="direct"):
-        """First box found for each phrase, or None."""
         batch = [self.grounding_messages(image, phrase, mode) for image, phrase in zip(images, phrases)]
         boxes = [self.parse_boxes(text) for text in self.chat(batch, self.grounding_tokens)]
         return [found[0] if found else None for found in boxes]
@@ -412,7 +407,6 @@ def load_vlm(name, model_id=None, device="cuda", dtype=torch.bfloat16):
 
 
 def parse_instructions(vlm, instructions):
-    """Split each compositional instruction into (referring expression, local instruction) pairs."""
     system_prompt = """
         You are an information extraction engine for fine-grained grounding in image editing.
         Given an instruction containing one or multiple edits, extract TWO aligned lists: {"Refer_object":[...], "New_edit_instruction":[...]}

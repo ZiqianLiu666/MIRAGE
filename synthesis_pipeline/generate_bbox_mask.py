@@ -33,7 +33,6 @@ def parse_args():
 
 
 def mask_to_polygon(mask):
-    """Largest outer contour of a binary mask as [x1, y1, x2, y2, ...]."""
     contours, _ = cv2.findContours((mask > 0).astype(np.uint8) * 255, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     return [int(v) for v in max(contours, key=cv2.contourArea).reshape(-1)]
 
