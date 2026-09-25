@@ -3,190 +3,55 @@ import json
 import os
 
 import torch
-from diffusers import AutoModel, Flux2Pipeline
-from transformers import Mistral3ForConditionalGeneration
+from diffusers import Flux2Pipeline
 from tqdm import tqdm
 
 
 def parse_args():
-    p = argparse.ArgumentParser(
-        description="FLUX.2-dev text-to-image from JSONL source_prompt."
-    )
-    p.add_argument(
-        "--jsonl",
-        required=True,
-        help="Input JSONL. Each line has {image, source_prompt, ...}.",
-    )
-    p.add_argument(
-        "--results-dir", required=True, help="Directory to save generated images."
-    )
-
-    p.add_argument(
-        "--repo-id",
-        default="black-forest-labs/FLUX.2-dev",
-        help="Model repo id.",
-    )
-    p.add_argument(
-        "--cpu-offload",
-        default="model",
-        choices=["none", "model", "sequential"],
-        help=(
-            "CPU offload mode. "
-            "'model' uses enable_model_cpu_offload (recommended), "
-            "'sequential' uses enable_sequential_cpu_offload (more memory saving, slower), "
-            "'none' keeps full model on --device."
-        ),
-    )
-    p.add_argument("--device", default="cuda:0", help="Device string.")
-    p.add_argument(
-        "--dtype", default="bf16", choices=["bf16", "fp16", "fp32"], help="Torch dtype."
-    )
-
-    p.add_argument(
-        "--num-steps",
-        type=int,
-        default=50,
-        help="Inference steps. FLUX.2-dev card uses 50 (and notes ~28 as speed/quality trade-off).",
-    )
-    p.add_argument(
-        "--guidance-scale",
-        type=float,
-        default=4.0,
-        help="CFG guidance scale. FLUX.2-dev card uses 4.0.",
-    )
-    p.add_argument("--seed", type=int, default=42, help="Base random seed.")
-    p.add_argument("--height", type=int, default=1024, help="Output height.")
-    p.add_argument("--width", type=int, default=1024, help="Output width.")
-
-    p.add_argument("--num-images", type=int, default=1, help="Images per prompt.")
-    p.add_argument(
-        "--batch-size", type=int, default=1, help="Number of prompts per batch."
-    )
-    p.add_argument(
-        "--skip-existing", action="store_true", help="Skip if output exists."
-    )
-
-    return p.parse_args()
-
-
-def dtype_from_str(dtype_str: str):
-    if dtype_str == "bf16":
-        return torch.bfloat16
-    if dtype_str == "fp16":
-        return torch.float16
-    return torch.float32
-
-
-def load_pipeline(repo_id: str, device: str, torch_dtype, cpu_offload: str = "model"):
-    print("Loading text encoder...")
-    text_encoder = Mistral3ForConditionalGeneration.from_pretrained(
-        repo_id,
-        subfolder="text_encoder",
-        torch_dtype=torch_dtype,
-        low_cpu_mem_usage=True,
-    )
-    if cpu_offload == "none":
-        text_encoder = text_encoder.to(device)
-
-    print("Loading DiT transformer...")
-    dit = AutoModel.from_pretrained(
-        repo_id,
-        subfolder="transformer",
-        torch_dtype=torch_dtype,
-        low_cpu_mem_usage=True,
-    )
-    if cpu_offload == "none":
-        dit = dit.to(device)
-
-    print("Loading Flux2Pipeline...")
-    pipe = Flux2Pipeline.from_pretrained(
-        repo_id,
-        text_encoder=text_encoder,
-        transformer=dit,
-        torch_dtype=torch_dtype,
-    )
-    if cpu_offload != "none":
-        if cpu_offload == "sequential":
-            pipe.enable_sequential_cpu_offload()
-        else:
-            pipe.enable_model_cpu_offload()
-    else:
-        pipe = pipe.to(device)
-    return pipe
+    parser = argparse.ArgumentParser(description="Render the image descriptions with FLUX.2 [dev] (Sec. A.2).")
+    parser.add_argument("--jsonl", required=True, help="output of generate_source_prompts.py")
+    parser.add_argument("--results-dir", required=True)
+    parser.add_argument("--repo-id", default="black-forest-labs/FLUX.2-dev")
+    parser.add_argument("--num-steps", type=int, default=50)
+    parser.add_argument("--guidance-scale", type=float, default=4.0)
+    parser.add_argument("--height", type=int, default=1024)
+    parser.add_argument("--width", type=int, default=1024)
+    parser.add_argument("--seed", type=int, default=42, help="image i is generated with seed + i")
+    parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--device", default="cuda")
+    parser.add_argument("--dtype", default="bfloat16", choices=["bfloat16", "float16", "float32"])
+    parser.add_argument("--cpu-offload", default="none", choices=["none", "model", "sequential"])
+    return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    pipe = Flux2Pipeline.from_pretrained(args.repo_id, torch_dtype=getattr(torch, args.dtype))
+    if args.cpu_offload == "model":
+        pipe.enable_model_cpu_offload()
+    elif args.cpu_offload == "sequential":
+        pipe.enable_sequential_cpu_offload()
+    else:
+        pipe.to(args.device)
+
+    with open(args.jsonl, encoding="utf-8") as f:
+        records = [json.loads(line) for line in f if line.strip()]
     os.makedirs(args.results_dir, exist_ok=True)
-
-    torch_dtype = dtype_from_str(args.dtype)
-    pipe = load_pipeline(
-        args.repo_id,
-        args.device,
-        torch_dtype,
-        cpu_offload=args.cpu_offload,
-    )
-    with open(args.jsonl, "r", encoding="utf-8") as f:
-        lines = [ln for ln in f if ln.strip()]
-
-    records = []
-    for idx, line in enumerate(lines):
-        rec = json.loads(line)
-
-        prompt = rec.get("source_prompt", "")
-        if not prompt:
-            print(f"[WARN] line {idx}: missing source_prompt, skip.")
-            continue
-
-        stem, ext = os.path.splitext(rec["image"].strip())
-
-        first_output_name = f"{stem}{ext}" if args.num_images == 1 else f"{stem}_00{ext}"
-        if args.skip_existing and os.path.exists(
-            os.path.join(args.results_dir, first_output_name)
-        ):
-            continue
-
-        records.append(
-            {
-                "prompt": prompt,
-                "stem": stem,
-                "ext": ext,
-                "seed_id": int(stem),
-            }
-        )
-
-    total_batches = (len(records) + args.batch_size - 1) // args.batch_size
-    for start in tqdm(range(0, len(records), args.batch_size), total=total_batches, desc="t2i"):
+    for start in tqdm(range(0, len(records), args.batch_size)):
         batch = records[start : start + args.batch_size]
-        prompts = [r["prompt"] for r in batch]
         generators = [
-            torch.Generator(device=args.device).manual_seed(args.seed + r["seed_id"])
-            for r in batch
+            torch.Generator(args.device).manual_seed(args.seed + int(os.path.splitext(r["image"])[0])) for r in batch
         ]
-
-        with torch.inference_mode():
-            images = pipe(
-                prompt=prompts,
-                generator=generators,
-                num_inference_steps=args.num_steps,
-                guidance_scale=args.guidance_scale,
-                height=args.height,
-                width=args.width,
-                num_images_per_prompt=args.num_images,
-            ).images
-
-        if args.num_images == 1:
-            for r, img in zip(batch, images):
-                img.save(os.path.join(args.results_dir, f"{r['stem']}{r['ext']}"))
-        else:
-            for i, r in enumerate(batch):
-                for j in range(args.num_images):
-                    img = images[i * args.num_images + j]
-                    img.save(
-                        os.path.join(args.results_dir, f"{r['stem']}_{j:02d}{r['ext']}")
-                    )
-
-    print("Done. Saved to:", args.results_dir)
+        images = pipe(
+            prompt=[r["source_prompt"] for r in batch],
+            generator=generators,
+            num_inference_steps=args.num_steps,
+            guidance_scale=args.guidance_scale,
+            height=args.height,
+            width=args.width,
+        ).images
+        for record, image in zip(batch, images):
+            image.save(os.path.join(args.results_dir, record["image"]))
 
 
 if __name__ == "__main__":

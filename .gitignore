@@ -4,12 +4,10 @@ __pycache__/
 .DS_Store
 .vscode/
 .idea/
+
+benchmark/
 **/results*/
 **/outputs/
-reports/
-tests/
-test_*.py
-*_test.py
 *.ckpt
 *.safetensors
 *.pt

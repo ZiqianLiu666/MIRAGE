@@ -3,348 +3,173 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
 
+import torch
 from PIL import Image
 from tqdm import tqdm
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from mirage.vlm import BACKENDS, load_vlm  # noqa: E402
 
-import utils.qwen_utils as qwen
 
-def parse_args() -> argparse.Namespace:
+def parse_args():
     parser = argparse.ArgumentParser(
-        description="Three-stage pipeline with warning-only validation, one retry for generation/extraction, and feedback-on-failure. Real-time saving."
+        description="Generate five edit instructions and their referring expressions per image (Sec. A.3)."
     )
     parser.add_argument("--image-dir", required=True)
-    parser.add_argument("--jsonl", required=True)
+    parser.add_argument("--jsonl", required=True, help="source prompts from generate_source_prompts.py")
     parser.add_argument("--out-jsonl", required=True)
     parser.add_argument("--slot-template", required=True)
     parser.add_argument("--generator-template", required=True)
     parser.add_argument("--extractor-template", required=True)
-    parser.add_argument("--max-items", type=int, default=None)
-    parser.add_argument("--retries", type=int, default=1, help="Additional retries after the first attempt. Default 1 => up to 2 attempts total.")
+    parser.add_argument("--vlm", default="qwen8b", choices=BACKENDS)
+    parser.add_argument("--device", default="cuda")
+    parser.add_argument("--retries", type=int, default=1, help="extra attempts, with feedback, after a failure")
     parser.add_argument("--slot-max-new-tokens", type=int, default=384)
     parser.add_argument("--gen-max-new-tokens", type=int, default=896)
     parser.add_argument("--ext-max-new-tokens", type=int, default=384)
     return parser.parse_args()
 
 
-def load_text(path: str) -> str:
-    return Path(path).read_text(encoding="utf-8").strip()
-
-
-def load_jsonl(path: str) -> List[Dict[str, Any]]:
-    p = Path(path)
-    if not p.exists():
-        return []
-    items = []
-    with p.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                items.append(json.loads(line))
-    return items
-
-
-def write_jsonl(path: str, items: List[Dict[str, Any]]):
-    out = Path(path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    tmp = out.with_suffix(out.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8") as f:
-        for item in items:
-            f.write(json.dumps(item, ensure_ascii=False) + "\n")
-    os.replace(tmp, out)
-
-
-def load_image(path: Path) -> Image.Image:
-    with Image.open(path) as img:
-        return img.convert("RGB")
-    
-def extract_json_any(text: str) -> Optional[Union[Dict[str, Any], List[Any]]]:
+def load_json(text):
     try:
         return json.loads(text.strip())
     except json.JSONDecodeError:
         return None
 
 
-def parse_slot_plan(text: str) -> Optional[Dict[str, Any]]:
-    obj = extract_json_any(text)
-    if not isinstance(obj, dict):
+def parse_slot_instructions(text):
+    data = load_json(text)
+    rows = data.get("slot_instructions") if isinstance(data, dict) else None
+    if not isinstance(rows, list) or len(rows) != 5:
         return None
-    n = obj.get("repeated_count")
-    cat = obj.get("repeated_category")
-    repeated_slots = obj.get("repeated_slots")
-    repeated_details = obj.get("repeated_details")
-    preferred_non_repeated_targets = obj.get("preferred_non_repeated_targets", [])
-    if not isinstance(n, int) or n not in (3, 4, 5):
-        return None
-    if not isinstance(cat, str) or not cat.strip():
-        return None
-    if not isinstance(repeated_slots, list) or len(repeated_slots) != n:
-        return None
-    if not isinstance(repeated_details, list) or len(repeated_details) != n:
-        return None
-    rs = []
-    for x in repeated_slots:
-        if not isinstance(x, str) or not x.strip():
+    parsed = []
+    for slot_id, row in enumerate(rows, start=1):
+        if not isinstance(row, dict) or row.get("slot_id") != slot_id:
             return None
-        rs.append(x.strip())
-    if len(set(rs)) != len(rs):
-        return None
-    rd = []
-    for x in repeated_details:
-        if not isinstance(x, str):
+        target, instruction = row.get("target"), row.get("edit_instruction")
+        if not (isinstance(target, str) and target.strip() and isinstance(instruction, str) and instruction.strip()):
             return None
-        rd.append(x.strip())
-    pnrt = []
-    if not isinstance(preferred_non_repeated_targets, list):
-        return None
-    for x in preferred_non_repeated_targets:
-        if not isinstance(x, str) or not x.strip():
-            return None
-        pnrt.append(x.strip())
-    if len(set(pnrt)) != len(pnrt):
-        return None
-    return {
-        "repeated_count": n,
-        "repeated_category": cat.strip(),
-        "repeated_slots": rs,
-        "repeated_details": rd,
-        "preferred_non_repeated_targets": pnrt,
-    }
+        parsed.append({"target": target.strip(), "edit_instruction": instruction.strip()})
+    return parsed
 
 
-def parse_slot_instructions(text: str) -> Optional[List[Dict[str, str]]]:
-    obj = extract_json_any(text)
-    if not isinstance(obj, dict):
+def parse_refer_objects(text):
+    data = load_json(text)
+    if isinstance(data, dict):
+        data = data.get("refer_object") or data.get("Refer_object")
+    if not isinstance(data, list) or len(data) != 5 or not all(isinstance(o, str) and o.strip() for o in data):
         return None
-    arr = obj.get("slot_instructions")
-    if not isinstance(arr, list) or len(arr) != 5:
-        return None
-    out = []
-    for i, row in enumerate(arr, start=1):
-        if not isinstance(row, dict):
-            return None
-        if row.get("slot_id") != i:
-            return None
-        target = row.get("target")
-        ins = row.get("edit_instruction")
-        if not isinstance(target, str) or not target.strip():
-            return None
-        if not isinstance(ins, str) or not ins.strip():
-            return None
-        out.append({"slot_id": i, "target": target.strip(), "edit_instruction": ins.strip()})
-    return out
+    return [o.strip() for o in data]
 
 
-def parse_refer_objects(text: str) -> Optional[List[str]]:
-    obj = extract_json_any(text)
-    arr = None
-    if isinstance(obj, dict):
-        arr = obj.get("refer_object")
-        if arr is None:
-            arr = obj.get("Refer_object")
-    elif isinstance(obj, list):
-        arr = obj
-    if not isinstance(arr, list) or len(arr) != 5:
-        return None
-    out = []
-    for x in arr:
-        if not isinstance(x, str) or not x.strip():
-            return None
-        out.append(x.strip())
-    return out
+def slot_problems(plan, rows):
+    problems = []
+    for i, (expected, row) in enumerate(zip(plan["repeated_slots"], rows)):
+        if row["target"] != expected:
+            problems.append(f"slot_instructions[{i}] target mismatch: expected {expected}")
+        if expected not in row["edit_instruction"]:
+            problems.append(f"slot_instructions[{i}] edit_instruction does not contain target verbatim: {expected}")
+    return problems
 
 
-def warn_stage1(plan: Dict[str, Any], slot_instructions: List[Dict[str, str]]) -> List[str]:
-    warnings = []
-    n = plan["repeated_count"]
-    repeated_slots = plan["repeated_slots"]
-    if len(slot_instructions) != 5:
-        warnings.append("wrong number of slot_instructions")
-        return warnings
-    for i in range(min(n, len(slot_instructions))):
-        expected_target = repeated_slots[i]
-        row = slot_instructions[i]
-        if row["target"] != expected_target:
-            warnings.append(f"slot_instructions[{i}] target mismatch: expected {expected_target}")
-        if expected_target not in row["edit_instruction"]:
-            warnings.append(f"slot_instructions[{i}] edit_instruction does not contain target verbatim: {expected_target}")
-    return warnings
-
-
-def warn_stage2(instructions: List[str], refer_objects: Optional[List[str]]) -> List[str]:
-    warnings = []
-    if refer_objects is None:
-        warnings.append("could not parse 5 refer_object")
-        return warnings
-    if len(refer_objects) != 5:
-        warnings.append("wrong number of refer_object")
-        return warnings
+def refer_problems(instructions, refer_objects):
+    problems = []
     if len(set(refer_objects)) != 5:
-        warnings.append("refer_object contains duplicates")
-    for i, (ins, ref) in enumerate(zip(instructions, refer_objects)):
-        if ref not in ins:
-            warnings.append(f"refer_object[{i}] is not exact substring of instruction[{i}]")
-    return warnings
+        problems.append("refer_object contains duplicates")
+    for i, (instruction, refer_object) in enumerate(zip(instructions, refer_objects)):
+        if refer_object not in instruction:
+            problems.append(f"refer_object[{i}] is not exact substring of instruction[{i}]")
+    return problems
 
 
-def build_feedback(reasons: List[str]) -> str:
-    if not reasons:
-        return "- None."
-    uniq = []
-    seen = set()
-    for r in reasons:
-        if r not in seen:
-            uniq.append(r)
-            seen.add(r)
-    return "\n".join(f"- {r}" for r in uniq[-6:])
+def feedback(problems):
+    return "\n".join(f"- {p}" for p in list(dict.fromkeys(problems))[-6:]) or "- None."
 
 
-def build_slot_messages(template: str, source_prompt: str):
-    text = template.replace("{source_prompt}", source_prompt)
-    return [{"role": "user", "content": [{"type": "text", "text": text}]}]
+def combine(instructions):
+    text = ", and ".join(s.strip().removesuffix(".") for s in instructions)
+    return text if text.endswith(".") else text + "."
 
 
-def build_generator_messages(template: str, image: Image.Image, image_name: str, slot_plan: Dict[str, Any], failure_feedback: str):
-    text = template.replace("{slot_plan_json}", json.dumps(slot_plan, ensure_ascii=False, indent=2))
-    text = text.replace("{failure_feedback}", failure_feedback)
-    text += f"\n\nIMAGE_FILENAME: {image_name}\n"
-    return [{"role": "user", "content": [{"type": "image", "image": image}, {"type": "text", "text": text}]}]
-
-
-def build_extractor_messages(template: str, instruction_list: List[str], failure_feedback: str):
-    text = template.replace("{instruction_list_json}", json.dumps(instruction_list, ensure_ascii=False))
-    text = text.replace("{failure_feedback}", failure_feedback)
-    return [{"role": "user", "content": [{"type": "text", "text": text}]}]
-
-
-def combine_instructions(instructions: List[str]) -> str:
-    parts = []
-    for s in instructions:
-        s = s.strip()
-        if s.endswith("."):
-            s = s[:-1]
-        parts.append(s)
-    out = ", and ".join(parts)
-    if not out.endswith("."):
-        out += "."
-    return out
-
-
-def ordered_output(source_records: List[Dict[str, Any]], result_by_image: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
-    ordered, seen = [], set()
-    for rec in source_records:
-        image_name = rec.get("image")
-        if isinstance(image_name, str) and image_name in result_by_image and image_name not in seen:
-            ordered.append(result_by_image[image_name]); seen.add(image_name)
-    for image_name, rec in result_by_image.items():
-        if image_name not in seen:
-            ordered.append(rec)
-    return ordered
+def ask(vlm, text, max_new_tokens, image=None):
+    content = [{"type": "text", "text": text}]
+    if image is not None:
+        content.insert(0, {"type": "image", "image": image})
+    return vlm.chat([[{"role": "user", "content": content}]], max_new_tokens=max_new_tokens)[0]
 
 
 def main():
     args = parse_args()
-    image_dir = Path(args.image_dir)
+    templates = {}
+    for key in ("slot", "generator", "extractor"):
+        with open(getattr(args, f"{key}_template"), encoding="utf-8") as f:
+            templates[key] = f.read().strip()
+    with open(args.jsonl, encoding="utf-8") as f:
+        records = [json.loads(line) for line in f if line.strip()]
+    vlm = load_vlm(args.vlm, device=args.device, dtype=torch.bfloat16)
 
-    slot_template = load_text(args.slot_template)
-    gen_template = load_text(args.generator_template)
-    ext_template = load_text(args.extractor_template)
+    with open(args.out_jsonl, "w", encoding="utf-8") as out:
+        for record in tqdm(records):
+            name = record["image"]
+            image = Image.open(os.path.join(args.image_dir, name)).convert("RGB")
 
-    source_records = load_jsonl(args.jsonl)
-    if args.max_items is not None:
-        source_records = source_records[:args.max_items]
+            # Stage 1: slot plan of the repeated instances, from the source prompt only.
+            prompt = templates["slot"].replace("{source_prompt}", record["source_prompt"])
+            plan = json.loads(ask(vlm, prompt, args.slot_max_new_tokens).strip())
+            plan = {
+                "repeated_count": plan["repeated_count"],
+                "repeated_category": plan["repeated_category"].strip(),
+                "repeated_slots": [s.strip() for s in plan["repeated_slots"]],
+                "repeated_details": [s.strip() for s in plan["repeated_details"]],
+                "preferred_non_repeated_targets": [s.strip() for s in plan["preferred_non_repeated_targets"]],
+            }
 
-    existing = load_jsonl(args.out_jsonl) if Path(args.out_jsonl).exists() else []
-    result_by_image = {item["image"]: item for item in existing if isinstance(item.get("image"), str)}
-
-    tasks = []
-    for rec in source_records:
-        image_name = rec.get("image")
-        if not isinstance(image_name, str) or not image_name:
-            continue
-        if image_name in result_by_image:
-            continue
-        img_path = image_dir / image_name
-        if not img_path.exists():
-            print(f"[WARN] missing image: {img_path}")
-            continue
-        tasks.append((image_name, img_path, rec.get("source_prompt", "")))
-
-    if not tasks:
-        print("No records to process.")
-        return
-
-    total_attempts = args.retries + 1
-
-    for image_name, img_path, source_prompt in tqdm(tasks, desc="slot+gen+extract"):
-        image = load_image(img_path)
-
-        slot_out = (qwen.get_backend().chat_batch([build_slot_messages(slot_template, source_prompt)], max_new_tokens=args.slot_max_new_tokens) or [""])[0]
-        slot_plan = parse_slot_plan(slot_out)
-
-        last_slot_instructions = None
-        gen_warnings: List[str] = []
-
-        for attempt in range(1, total_attempts + 1):
-            gen_out = (qwen.get_backend().chat_batch([build_generator_messages(gen_template, image, image_name, slot_plan, build_feedback(gen_warnings))], max_new_tokens=args.gen_max_new_tokens) or [""])[0]
-            slot_instructions = parse_slot_instructions(gen_out)
-            if slot_instructions is None:
-                reason = "could not parse 5 slot_instructions"
-                print(f"[GEN FAIL] {image_name} try {attempt}: {reason}")
-                gen_warnings.append(reason)
+            # Stage 2: five edit instructions grounded in the image.
+            rows, problems = None, []
+            for _ in range(args.retries + 1):
+                prompt = templates["generator"].replace(
+                    "{slot_plan_json}", json.dumps(plan, ensure_ascii=False, indent=2)
+                )
+                prompt = prompt.replace("{failure_feedback}", feedback(problems)) + f"\n\nIMAGE_FILENAME: {name}\n"
+                parsed = parse_slot_instructions(ask(vlm, prompt, args.gen_max_new_tokens, image))
+                if parsed is None:
+                    problems.append("could not parse 5 slot_instructions")
+                    continue
+                rows = parsed
+                current = slot_problems(plan, rows)
+                problems += current
+                if not current:
+                    break
+            if rows is None:
+                tqdm.write(f"{name}: no valid edit instructions, skipped")
                 continue
-            last_slot_instructions = slot_instructions
-            curr_warnings = warn_stage1(slot_plan, slot_instructions)
-            if curr_warnings and attempt < total_attempts:
-                for w in curr_warnings:
-                    print(f"[PLAN FAIL] {image_name} try {attempt}: {w}")
-                gen_warnings.extend(curr_warnings)
-                continue
-            for w in curr_warnings:
-                print(f"[PLAN FAIL] {image_name}: {w}")
-            break
+            instructions = [row["edit_instruction"] for row in rows]
 
-        if last_slot_instructions is None:
-            write_jsonl(args.out_jsonl, ordered_output(source_records, result_by_image))
-            continue
-
-        instructions = [row["edit_instruction"] for row in last_slot_instructions]
-
-        last_refer_objects = None
-        ext_warnings: List[str] = []
-
-        for attempt in range(1, total_attempts + 1):
-            ext_out = (qwen.get_backend().chat_batch([build_extractor_messages(ext_template, instructions, build_feedback(ext_warnings))], max_new_tokens=args.ext_max_new_tokens) or [""])[0]
-            refer_objects = parse_refer_objects(ext_out)
+            # Stage 3: referring expressions copied verbatim from the instructions.
+            refer_objects, problems = None, []
+            for _ in range(args.retries + 1):
+                prompt = templates["extractor"].replace(
+                    "{instruction_list_json}", json.dumps(instructions, ensure_ascii=False)
+                )
+                parsed = parse_refer_objects(
+                    ask(vlm, prompt.replace("{failure_feedback}", feedback(problems)), args.ext_max_new_tokens)
+                )
+                if parsed is None:
+                    problems.append("could not parse 5 refer_object")
+                    continue
+                refer_objects = parsed
+                current = refer_problems(instructions, refer_objects)
+                problems += current
+                if not current:
+                    break
             if refer_objects is None:
-                reason = "could not parse 5 refer_object"
-                print(f"[EXT FAIL] {image_name} try {attempt}: {reason}")
-                ext_warnings.append(reason)
+                tqdm.write(f"{name}: no valid referring expressions, skipped")
                 continue
-            last_refer_objects = refer_objects
-            curr_warnings = warn_stage2(instructions, refer_objects)
-            if curr_warnings and attempt < total_attempts:
-                for w in curr_warnings:
-                    print(f"[VALIDATION FAIL] {image_name} try {attempt}: {w}")
-                ext_warnings.extend(curr_warnings)
-                continue
-            for w in curr_warnings:
-                print(f"[VALIDATION FAIL] {image_name}: {w}")
-            break
 
-        result_by_image[image_name] = {
-            "image": image_name,
-            "editing_instruction": combine_instructions(instructions),
-            "refer_object": last_refer_objects if last_refer_objects is not None else [],
-        }
-        write_jsonl(args.out_jsonl, ordered_output(source_records, result_by_image))
-
-    print(f"Done. wrote {len(result_by_image)} rows to {args.out_jsonl}")
+            result = {"image": name, "editing_instruction": combine(instructions), "refer_object": refer_objects}
+            out.write(json.dumps(result, ensure_ascii=False) + "\n")
+            out.flush()
 
 
 if __name__ == "__main__":

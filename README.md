@@ -25,6 +25,11 @@ conda activate mirage
 pip install -r requirements.txt
 ```
 
+The mask generation step of the synthesis pipeline additionally needs [SAM 2](https://github.com/facebookresearch/sam2):
+```bash
+pip install "git+https://github.com/facebookresearch/sam2.git"
+```
+
 Don't forget to log in to your Hugging Face account to get model access:
 ```bash
 echo 'export HF_TOKEN=xxx' >> ~/.bashrc
@@ -36,23 +41,17 @@ To quickly try MIRAGE, you can run the following commands directly. The benchmar
 
 ```bash
 # FLUX.2 [klein]-9B + MIRAGE
-python quick_start.py \
-  --model flux2_klein9b \
-  --results-full-dir results/flux2_klein9B \
-  --patch-ratio 0.2
+python quick_start.py --model flux2_klein9b --output-dir results/flux2_klein9b
 
-# FLUX.2 [Dev] + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
-python quick_start.py \
-  --model flux2_dev \
-  --results-full-dir results/flux2_dev \
-  --patch-ratio 0.2
+# FLUX.2 [dev] + MIRAGE
+python quick_start.py --model flux2_dev --output-dir results/flux2_dev
 
-# Qwen-Image-Edit-2511 + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
-python quick_start.py \
-  --model qwen2511 \
-  --results-full-dir results/qwen2511 \
-  --patch-ratio 0.2
+# Qwen-Image-Edit-2511 + MIRAGE
+python quick_start.py --model qwen2511 --output-dir results/qwen2511
 ```
+
+If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`.
+`--patch-ratio` is the fraction of the denoising steps handled by the region branches, i.e. 1 - ρ in the paper. The default of 0.4 is the setting we use on MIRAGE-Bench; for single-instruction benchmarks such as RefEdit-Bench we use 0.2.
 
 # 2. Automatic Image Synthesis Pipeline
 We provide a fully automated pipeline for generating image with multiple similar instances and composite editing instructions. If you need, please run the following commands in sequence to obtain a complete synthesized dataset.
@@ -61,14 +60,14 @@ Alternatively, you can directly download the benchmark from the [link](#benchmar
 
 ```bash
 ## 2.1 Image Description Generation
-python synthesis_pipeline/generate_source_prompts_batch_pairs.py \
+python synthesis_pipeline/generate_source_prompts.py \
   --pair-template synthesis_pipeline/prompt_template/image_description/prompt_pair_batch.txt \
   --generator-template synthesis_pipeline/prompt_template/image_description/prompt_draft_generator.txt \
   --judge-template synthesis_pipeline/prompt_template/image_description/prompt_judge.txt \
   --out synthesis_pipeline/source_prompts.jsonl \
   --num-samples 200
 
-## 2.2 Image Generation (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
+## 2.2 Image Generation
 python synthesis_pipeline/flux_t2i_generate.py \
   --jsonl synthesis_pipeline/source_prompts.jsonl \
   --results-dir benchmark \
@@ -94,7 +93,7 @@ python synthesis_pipeline/generate_bbox_mask.py \
 We provide MIRAGE integration pipelines for multiple base image editing models.
 
 ## 3.1 Target Localization
-Before running inference, first obtain cropped regions corresponding to the target objects:
+Before running inference, first decompose the instructions and obtain the cropped regions of the target objects with a VLM (Qwen3.5-9B by default, see `--vlm` for the other localizers used in the paper):
 
 ```bash
 python crop_image.py \
@@ -106,52 +105,43 @@ python crop_image.py \
 ```
 
 ## 3.2 Base model + MIRAGE
-Run MIRAGE on different base models:
+Run MIRAGE on a base model, where `--model` is one of `flux2_klein9b`, `flux2_dev` and `qwen2511`:
 ```bash
-# FLUX.2[klein]-9B + MIRAGE
-python inference_mydemo_flux2_klein9B.py \
+python inference.py \
+  --model flux2_klein9b \
   --image-root benchmark \
   --instruction-jsonl benchmark/annotations.jsonl \
-  --crop-dir benchmark/crops \
-  --results-full-dir results/flux2_klein9B \
-  --patch-ratio 0.2
-```
-
-```bash
-# Flux.2[Dev] + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
-python inference_mydemo_flux2_dev.py \
-  --image-root benchmark \
-  --instruction-jsonl benchmark/annotations.jsonl \
-  --crop-dir benchmark/crops \
-  --results-full-dir results/flux2_dev \
-  --patch-ratio 0.2
-```
-
-```bash
-# Qwen-Image-Edit-2511 + MIRAGE (If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`)
-python inference_mydemo_qwen2511.py \
-  --image-root benchmark \
-  --instruction-jsonl benchmark/annotations.jsonl \
-  --crop-dir benchmark/crops \
-  --results-full-dir results/qwen2511 \
-  --patch-ratio 0.2
+  --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
+  --output-dir results/flux2_klein9b
 ```
 
 # 4. Evaluation
+All evaluators take the edited images of one method and compare them with the benchmark images. Use `--mask-alignment-policy full-frame` for MIRAGE outputs and `flux2-crop` for outputs of the official FLUX.2 pipelines. The OpenAI judges read the API key from `OPENAI_API_KEY`.
+
 ## LLM-based Metrics
-**PF** and **Cons** are computed using a local open-source Qwen model, while **PQ** is evaluated using the GPT API.
+**PF**, **Cons** and **PQ** judged by OpenAI models:
 ```bash
-# PF, Cons, PQ
-python metrics/EditScore/evaluation.py \
+python metrics/evaluate_gpt.py \
   --annotations-jsonl benchmark/annotations.jsonl \
   --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
   --input-image-root benchmark \
   --edited-image-root results/your_results \
-  --result-dir metrics/results/LLM/your_results \
+  --result-dir metrics/results/gpt/your_results \
+  --mask-alignment-policy full-frame
+```
+
+**PF** and **Cons** computed with a local EditScore model, while **PQ** is evaluated using the GPT API. The EditScore judge runs on [vLLM](https://github.com/vllm-project/vllm) by default (we used `vllm==0.11.0`); pass `--sc-backbone qwen3vl` to run it with Transformers instead.
+```bash
+python metrics/evaluate_editscore.py \
+  --annotations-jsonl benchmark/annotations.jsonl \
+  --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
+  --input-image-root benchmark \
+  --edited-image-root results/your_results \
+  --result-dir metrics/results/editscore/your_results \
+  --mask-alignment-policy full-frame \
   --sc-model-name-or-path Qwen/Qwen3-VL-8B-Instruct \
   --sc-lora-path EditScore/EditScore-Qwen3-VL-8B-Instruct \
-  --pq-model-name-or-path gpt-5.1 \
-  --pq-key YOUR_OPENAI_API_KEY \
+  --pq-model gpt-5.1 \
   --num-pass 3
 ```
 
@@ -160,12 +150,12 @@ Compute pixel-level similarity metrics:
 
 ```bash
 # MSE, LPIPS, PSNR...
-python metrics/traditional/evalaute_traditional.py \
-  --annotation_mapping_file benchmark/annotations.jsonl \
-  --src_image_folder benchmark \
+python metrics/evaluate_traditional.py \
+  --annotations-jsonl benchmark/annotations.jsonl \
   --crop-instruction-jsonl benchmark/crops/crop_instruction.jsonl \
-  --tgt_method results/your_results \
-  --result_path metrics/results/traditional/your_results/metric_summary.csv
+  --input-image-root benchmark \
+  --edited-image-root results/your_results \
+  --result-csv metrics/results/traditional/metric_summary.csv
 ```
 
 # Citation
@@ -181,23 +171,3 @@ If you use this code or the benchmark in your research, please cite our paper:
       url={https://arxiv.org/abs/2604.05180}, 
 }
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
