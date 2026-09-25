@@ -1,4 +1,4 @@
-"""Run MIRAGE on MIRAGE-Bench downloaded from the Hugging Face Hub.
+"""Run MIRAGE on MIRA-Bench downloaded from the Hugging Face Hub.
 
 All other arguments are forwarded to inference.py, e.g.
     python quick_start.py --model flux2_klein9b --output-dir results/flux2_klein9b
