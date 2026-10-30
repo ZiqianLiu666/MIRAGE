@@ -6,7 +6,7 @@
 
 > **Abstract:** *Instruction-guided image editing has seen remarkable progress with models like FLUX.2 and Qwen-Image-Edit, yet they still struggle with complex scenarios involving multiple similar instances, each requiring individual edits. We observe that state-of-the-art models suffer from severe over-editing and spatial misalignment when faced with multiple identical instances and composite instructions. To address this, we introduce a comprehensive benchmark specifically designed to evaluate fine-grained consistency in multi-instance and multi-instruction settings. We further propose Multi-Instance Regional Alignment via Guided Editing (MIRAGE), a training-free framework for precise, localized editing. By leveraging a vision-language model to decompose complex instructions into region-specific subsets, MIRAGE employs a multi-branch parallel denoising strategy that injects target-region latents into the global representation while preserving background integrity through a reference trajectory. Extensive evaluations on MIRA-Bench and RefEdit-Bench demonstrate that our framework significantly outperforms existing methods in achieving precise instance-level modifications while maintaining strong background consistency.*
 
-![overview](jpg/mybench_qualitative.jpg)
+![overview](jpg/mybench_qualitative.pdf)
 **Fig. 1: Example images and instructions involving multiple similar instances and compositional edits.** Such scenarios are challenging for state-of-the-art models, which often introduce unintended modifications. In contrast, MIRAGE achieves precise instance-level editing while preserving background consistency.
 
 # Benchmark Access
@@ -14,7 +14,7 @@ We release **MIRA-Bench**, which can be downloaded on [Huggingface](https://hugg
 
 Notably, the entire **MIRA-Bench** is constructed based on our proposed [Automatic Image Synthesis Pipeline](#2-Automatic-Image-Synthesis-Pipeline).
 
-![benchmark](jpg/benchmark_example.jpg)
+![benchmark](jpg/benchmark_example.pdf)
 **Fig. 2: MIRA-Bench sample examples.** The first row shows the synthesized original images, the second row presents the corresponding ground-truth (GT) masks of the target regions, and the third row displays the editing instructions constructed based on the generated image semantics and the source prompts.
 
 # 1. Requirements
@@ -53,43 +53,7 @@ python quick_start.py --model qwen2511 --output-dir results/qwen2511
 If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-offload model` or even `--cpu-offload sequential`.
 `--patch-ratio` is the fraction of the denoising steps handled by the region branches, i.e. 1 - ρ in the paper. The default of 0.4 is the setting we use on MIRA-Bench; for single-instruction benchmarks such as RefEdit-Bench we use 0.2.
 
-# 2. Automatic Image Synthesis Pipeline
-We provide a fully automated pipeline for generating images with multiple similar instances and composite editing instructions. If you need, please run the following commands in sequence to obtain a complete synthesized dataset.
-
-Alternatively, you can directly download the benchmark from the [link](#benchmark-access) above and proceed to [Base model + MIRAGE](#32-base-model--mirage) for inference, or simply follow the [Quick Start](#quick-start) instructions above without running the **Automatic Image Synthesis Pipeline**.
-
-```bash
-## 2.1 Image Description Generation
-python synthesis_pipeline/generate_source_prompts.py \
-  --pair-template synthesis_pipeline/prompt_template/image_description/prompt_pair_batch.txt \
-  --generator-template synthesis_pipeline/prompt_template/image_description/prompt_draft_generator.txt \
-  --judge-template synthesis_pipeline/prompt_template/image_description/prompt_judge.txt \
-  --out synthesis_pipeline/source_prompts.jsonl \
-  --num-samples 200
-
-## 2.2 Image Generation
-python synthesis_pipeline/flux_t2i_generate.py \
-  --jsonl synthesis_pipeline/source_prompts.jsonl \
-  --results-dir benchmark \
-  --batch-size 2
-
-## 2.3 Editing Instruction Generation
-python synthesis_pipeline/generate_instruction_refer.py \
-  --image-dir benchmark \
-  --jsonl synthesis_pipeline/source_prompts.jsonl \
-  --out-jsonl benchmark/annotations.jsonl \
-  --slot-template synthesis_pipeline/prompt_template/instruction/repeated_slot_plan.txt \
-  --generator-template synthesis_pipeline/prompt_template/instruction/instruction_generate.txt \
-  --extractor-template synthesis_pipeline/prompt_template/instruction/refer_extract.txt
-
-## 2.4 Mask Generation
-python synthesis_pipeline/generate_bbox_mask.py \
-  --image-dir benchmark \
-  --jsonl benchmark/annotations.jsonl \
-  --vis-dir benchmark/bbox_mask_vis
-```
-
-# 3. Inference
+# 2. Inference
 We provide MIRAGE integration pipelines for multiple base image editing models.
 
 ## 3.1 Target Localization
