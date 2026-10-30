@@ -12,8 +12,6 @@
 # Benchmark Access
 We release **MIRA-Bench**, which can be downloaded on [Huggingface](https://huggingface.co/datasets/ziqiangoodgood/MIRAGE) or [Google Drive](https://drive.google.com/file/d/14uIOvaf7bi4PTc1PRRbbyYRuwbBkPmUc/view?usp=sharing) directly. The benchmark contains 200 samples from real world, each consisting of an image, a composite editing instruction formed by combining five sub-instructions, and the corresponding ground-truth mask. This benchmark is designed to evaluate image editing models in more complex referring-expression scenarios. 
 
-Notably, the entire **MIRA-Bench** is constructed based on our proposed [Automatic Image Synthesis Pipeline](#2-Automatic-Image-Synthesis-Pipeline).
-
 ![benchmark](jpg/benchmark_example.png)
 **Fig. 2: MIRA-Bench sample examples.** Easy (top) and hard (bottom) examples containing 3, 4, and 5 similar instances. And the different colors in the instructions correspond to the editing sections in the diagram.
 
@@ -24,11 +22,6 @@ Install the required dependencies:
 conda create -n mirage python=3.12 -y
 conda activate mirage
 pip install -r requirements.txt
-```
-
-The mask generation step of the synthesis pipeline additionally needs [SAM 2](https://github.com/facebookresearch/sam2):
-```bash
-pip install "git+https://github.com/facebookresearch/sam2.git"
 ```
 
 Don't forget to log in to your Hugging Face account to get model access:
@@ -58,7 +51,7 @@ If GPU memory is insufficient, you can enable CPU offloading by adding `--cpu-of
 We provide MIRAGE integration pipelines for multiple base image editing models.
 
 ## 2.1 Target Localization
-Before running inference, first decompose the instructions and obtain the cropped regions of the target objects with a VLM. `--vlm` supports `qwen35` (Qwen3.5-9B, default) and `gemma4`:
+Before running inference, first decompose the instructions and obtain the cropped regions of the target objects with a VLM. `--vlm` supports `Gemma-4-12B` and `Qwen3.5-9B`:
 
 ```bash
 python crop_image.py \
@@ -81,7 +74,6 @@ python inference.py \
 ```
 
 # 3. Evaluation
-Use `--mask-alignment-policy full-frame` for MIRAGE outputs and `flux2-crop` for outputs of the official FLUX.2 pipelines. The OpenAI judges read the API key from `OPENAI_API_KEY`.
 
 ## LLM-based Metrics
 **PF**, **Cons** and **PQ** are all judged by GPT models:
