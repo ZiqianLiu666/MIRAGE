@@ -15,7 +15,7 @@ We release **MIRA-Bench**, which can be downloaded on [Huggingface](https://hugg
 Notably, the entire **MIRA-Bench** is constructed based on our proposed [Automatic Image Synthesis Pipeline](#2-Automatic-Image-Synthesis-Pipeline).
 
 ![benchmark](jpg/benchmark_example.pdf)
-**Fig. 2: MIRA-Bench sample examples.** Easy (top) and hard (bottom) examples containing 3, 4, and 5 similar instances.
+**Fig. 2: MIRA-Bench sample examples.** Easy (top) and hard (bottom) examples containing 3, 4, and 5 similar instances. And the different colors in the instructions correspond to the editing sections in the diagram.
 
 # 1. Requirements
 Install the required dependencies:
