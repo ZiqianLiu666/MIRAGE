@@ -57,8 +57,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
+def main(args=None, request_fn=None):
+    """Run shared scoring; request_fn optionally replaces the model transport."""
+    args = parse_args() if args is None else args
     scale = args.score_range / 10
 
     def image_content(image):
@@ -68,6 +69,8 @@ def main():
         return {"type": "image_url", "image_url": {"url": url, "detail": args.image_detail}}
 
     def request(model, content, name, schema):
+        if request_fn is not None:
+            return request_fn(model, content, name, schema)
         response = requests.post(
             args.openai_url,
             json={

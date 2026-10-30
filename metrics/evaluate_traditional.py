@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from common import load_samples, polygon_mask
+from common import load_samples, polygon_mask, select_evaluation_samples
 from traditional import MetricsCalculator
 
 COLUMNS = ["Structure Distance", "PSNR", "LPIPS", "MSE", "SSIM", "CLIP Whole", "CLIP Edited"]
@@ -23,15 +23,23 @@ def parse_args():
     parser.add_argument("--edited-image-root", required=True)
     parser.add_argument("--result-csv", required=True)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument(
+        "--skip-missing-edits", action="store_true", help="Skip samples without an edited image."
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    samples = load_samples(args.annotations_jsonl, args.crop_instruction_jsonl)
+    selected, skipped = select_evaluation_samples(args, samples)
+    if skipped:
+        print(f"Skipping {len(skipped)} missing edited images: {', '.join(skipped)}")
+    print(f"Evaluating {len(selected)}/{len(samples)} images")
     calculator = MetricsCalculator(args.device)
     scores = {column: [] for column in COLUMNS}
 
-    for name, instruction, masks, edits in tqdm(load_samples(args.annotations_jsonl, args.crop_instruction_jsonl)):
+    for _, (name, instruction, masks, edits) in tqdm(selected):
         source = Image.open(os.path.join(args.input_image_root, name)).convert("RGB")
         edited = Image.open(os.path.join(args.edited_image_root, name)).convert("RGB")
 

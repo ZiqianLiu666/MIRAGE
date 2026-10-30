@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument("--slot-template", required=True)
     parser.add_argument("--generator-template", required=True)
     parser.add_argument("--extractor-template", required=True)
-    parser.add_argument("--vlm", default="qwen8b", choices=BACKENDS)
+    parser.add_argument("--vlm", default="qwen35", choices=BACKENDS)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--retries", type=int, default=1, help="extra attempts, with feedback, after a failure")
     parser.add_argument("--slot-max-new-tokens", type=int, default=384)
@@ -114,7 +114,6 @@ def main():
             name = record["image"]
             image = Image.open(os.path.join(args.image_dir, name)).convert("RGB")
 
-            # Stage 1: slot plan of the repeated instances, from the source prompt only.
             prompt = templates["slot"].replace("{source_prompt}", record["source_prompt"])
             plan = json.loads(ask(vlm, prompt, args.slot_max_new_tokens).strip())
             plan = {
@@ -125,7 +124,6 @@ def main():
                 "preferred_non_repeated_targets": [s.strip() for s in plan["preferred_non_repeated_targets"]],
             }
 
-            # Stage 2: five edit instructions grounded in the image.
             rows, problems = None, []
             for _ in range(args.retries + 1):
                 prompt = templates["generator"].replace(
@@ -146,7 +144,6 @@ def main():
                 continue
             instructions = [row["edit_instruction"] for row in rows]
 
-            # Stage 3: referring expressions copied verbatim from the instructions.
             refer_objects, problems = None, []
             for _ in range(args.retries + 1):
                 prompt = templates["extractor"].replace(

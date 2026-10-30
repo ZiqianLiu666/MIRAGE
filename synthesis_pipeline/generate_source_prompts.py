@@ -74,7 +74,7 @@ def parse_tags(text):
     for line in text.splitlines():
         match = re.match(r"^\s*([A-Z0-9_]+)\s*:\s*(.*?)\s*$", line)
         if match and match[2]:
-            tags[match[1].upper()] = match[2]
+            tags[match[1]] = match[2]
     return tags
 
 

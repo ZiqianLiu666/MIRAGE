@@ -24,7 +24,7 @@ def parse_args():
     )
     parser.add_argument("--image-dir", required=True)
     parser.add_argument("--jsonl", required=True)
-    parser.add_argument("--vlm", default="qwen8b", choices=BACKENDS)
+    parser.add_argument("--vlm", default="qwen35", choices=BACKENDS)
     parser.add_argument("--sam2-model-id", default="facebook/sam2-hiera-large")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--batch-size", type=int, default=4, help="images per VLM batch")
@@ -64,12 +64,7 @@ def main():
         found = iter(vlm.locate([image for image, _ in queries], [phrase for _, phrase in queries]))
 
         for record, image in zip(batch, images):
-            boxes = []
-            for phrase in record["refer_object"]:
-                box = next(found)
-                if box is None:
-                    raise ValueError(f"{args.vlm} found no box for '{phrase}' in {record['image']}")
-                boxes.append(to_pixels(box, image.size))
+            boxes = [to_pixels(next(found), image.size) for _ in record["refer_object"]]
 
             polygons = []
             with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):

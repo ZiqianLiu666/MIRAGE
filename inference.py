@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import tempfile
 import time
 from collections import defaultdict
 
@@ -39,6 +40,8 @@ def build_parser():
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--dtype", default="bfloat16", choices=["bfloat16", "float16", "float32"])
     parser.add_argument("--cpu-offload", default="none", choices=["none", "model", "sequential"])
+    parser.add_argument("--skip-existing", action="store_true",
+                        help="resume by skipping existing nonempty output images")
     return parser
 
 
@@ -67,16 +70,33 @@ def qwen_prompt(record):
 
 
 def main(args):
-    instructions = {r["image"]: r["editing_instruction"] for r in load_jsonl(args.instruction_jsonl)}
+    annotations = load_jsonl(args.instruction_jsonl)
+    instructions = {r["image"]: r["editing_instruction"] for r in annotations}
+    if len(instructions) != len(annotations):
+        raise ValueError("Duplicate image names in instruction JSONL")
+    names = sorted(instructions)
+    if args.skip_existing:
+        names = [name for name in names
+                 if not (os.path.isfile(os.path.join(args.output_dir, name))
+                         and os.path.getsize(os.path.join(args.output_dir, name)) > 0)]
+        print(f"Skipping {len(instructions) - len(names)} completed images; {len(names)} images remaining.")
+    if not names:
+        print("No images remaining; no model loaded.")
+        return
+
     crops = defaultdict(list)
     for record in load_jsonl(args.crop_instruction_jsonl):
-        crops[record["original_image"]].append(record)
+        if record["original_image"] in instructions:
+            crops[record["original_image"]].append(record)
+    missing = [name for name in names if not crops.get(name)]
+    if missing:
+        raise ValueError(f"Missing crop records for selected images: {', '.join(missing)}")
 
     pipe = load_pipeline(args.model, args.device, getattr(torch, args.dtype), args.cpu_offload)
     num_steps = args.num_steps or MODELS[args.model][2]
     os.makedirs(args.output_dir, exist_ok=True)
 
-    for name in tqdm(sorted(crops)):
+    for name in tqdm(names):
         records = sorted(crops[name], key=lambda r: r["image"])
         image = Image.open(os.path.join(args.image_root, name)).convert("RGB")
         bboxes = [r["bbox"] for r in records]
@@ -95,7 +115,19 @@ def main(args):
                 pipe, image, instructions[name], sub_prompts, bboxes, guidance_scale=args.guidance_scale, **options
             )
         tqdm.write(f"{name}: {time.perf_counter() - start:.1f}s")
-        edited.save(os.path.join(args.output_dir, name))
+        output_path = os.path.join(args.output_dir, name)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        # Publish a complete image atomically, so an interrupted save is retried.
+        with tempfile.NamedTemporaryFile(dir=os.path.dirname(output_path),
+                                         prefix=".mirage-", suffix=os.path.splitext(name)[1],
+                                         delete=False) as temporary:
+            temporary_path = temporary.name
+        try:
+            edited.save(temporary_path)
+            os.replace(temporary_path, output_path)
+        finally:
+            if os.path.exists(temporary_path):
+                os.remove(temporary_path)
 
 
 if __name__ == "__main__":

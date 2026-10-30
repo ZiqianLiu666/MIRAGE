@@ -45,8 +45,19 @@ def run_flux2(
     guidance_scale=4.0,
     patch_ratio=0.4,
     generator=None,
+    ablation_mode="full",
 ):
-    """MIRAGE on FLUX.2 [dev] or [klein]; `bboxes` are pixel boxes of `image`."""
+    """MIRAGE on FLUX.2; optionally disable target or background replacement.
+
+    full: regional-to-global handover with reference background replacement.
+    bg_only: global denoising with background replacement, without regional pasting.
+    crop_only: paste regions at the same handover onto a globally denoised canvas,
+        without replacing the background with the reference.
+    """
+    if ablation_mode not in ("full", "bg_only", "crop_only"):
+        raise ValueError(f"Unknown ablation_mode: {ablation_mode!r}")
+    replace_target = ablation_mode != "bg_only"
+    replace_background = ablation_mode != "crop_only"
     device = pipe._execution_device
     dtype = pipe.transformer.dtype
     channels = pipe.transformer.config.in_channels // 4
@@ -127,28 +138,44 @@ def run_flux2(
         sigma = scheduler.sigmas[i + 1].to(clean.dtype)
         return sigma * noise + (1 - sigma) * clean
 
+    def global_step(latents, timestep, t):
+        v = velocity(latents, full, timestep)
+        return scheduler.step(v, t, latents, return_dict=False)[0]
+
+    def restore_background(latents, i):
+        canvas = noised(full["clean"], full["noise"], i)
+        denoised = pipe._unpack_latents_with_ids(latents, full["ids"])
+        for y1, y2, x1, x2 in (branch["box"] for branch in branches):
+            canvas[..., y1:y2, x1:x2] = denoised[..., y1:y2, x1:x2]
+        return pipe._pack_latents(canvas)
+
     handover = int(len(timesteps) * patch_ratio)
     latents = full["latents"]
     for i, t in enumerate(tqdm(timesteps, leave=False)):
         timestep = t.expand(1).to(dtype)
         if i < handover:
-            for branch in branches:
-                v = velocity(branch["latents"], branch, timestep)
-                branch["latents"] = branch["scheduler"].step(v, t, branch["latents"], return_dict=False)[0]
-            if i == handover - 1:
+            if replace_target:
+                for branch in branches:
+                    v = velocity(branch["latents"], branch, timestep)
+                    branch["latents"] = branch["scheduler"].step(v, t, branch["latents"], return_dict=False)[0]
+            # When one replacement component is disabled, the global canvas must
+            # advance to the handover's noise level before continuing or pasting.
+            if not replace_target or not replace_background:
+                latents = global_step(latents, timestep, t)
+                if replace_background:
+                    latents = restore_background(latents, i)
+            if replace_target and i == handover - 1:
                 pasted = []
                 for branch in branches:
                     z = pipe._unpack_latents_with_ids(branch["latents"], branch["ids"])
                     pasted.append((z, branch["box"], z - noised(branch["clean"], branch["noise"], i)))
-                latents = pipe._pack_latents(compose(noised(full["clean"], full["noise"], i), pasted))
+                canvas = (noised(full["clean"], full["noise"], i) if replace_background else
+                          pipe._unpack_latents_with_ids(latents, full["ids"]))
+                latents = pipe._pack_latents(compose(canvas, pasted))
         else:
-            v = velocity(latents, full, timestep)
-            latents = scheduler.step(v, t, latents, return_dict=False)[0]
-            canvas = noised(full["clean"], full["noise"], i)
-            denoised = pipe._unpack_latents_with_ids(latents, full["ids"])
-            for y1, y2, x1, x2 in (branch["box"] for branch in branches):
-                canvas[..., y1:y2, x1:x2] = denoised[..., y1:y2, x1:x2]
-            latents = pipe._pack_latents(canvas)
+            latents = global_step(latents, timestep, t)
+            if replace_background:
+                latents = restore_background(latents, i)
 
     latents = pipe._unpack_latents_with_ids(latents, full["ids"])
     bn_mean = pipe.vae.bn.running_mean.view(1, -1, 1, 1).to(latents.device, latents.dtype)

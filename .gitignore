@@ -12,3 +12,4 @@ benchmark/
 *.safetensors
 *.pt
 *.pth
+/checkpoints/
