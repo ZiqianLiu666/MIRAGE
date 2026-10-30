@@ -59,7 +59,8 @@ python crop_image.py \
   --instruction-jsonl benchmark/annotations.jsonl \
   --output-dir benchmark/crops \
   --out-jsonl benchmark/crops/crop_instruction.jsonl \
-  --batch-size 2
+  --batch-size 2 \
+  --vlm gemma4
 ```
 
 ## 2.2 Base model + MIRAGE
