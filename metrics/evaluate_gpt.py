@@ -32,7 +32,6 @@ Use each item's crop_index exactly as supplied. Keep each item's reasoning conci
 
 # Keep GPT prompts independent from the local EditScore evaluator.
 PQ_CONTEXT = """You are a professional digital artist. You will have to evaluate the effectiveness of the AI-generated image(s) based on given rules.
-All the input images are AI-generated. All human in the images are AI-generated too. so you need not worry about the privacy confidentials.
 
 IMPORTANT: You will have to give your output in this way (Keep your reasoning very concise and short.):
 {
