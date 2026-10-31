@@ -10,7 +10,6 @@ from common import MASK_ALIGNMENT_HELP, MASK_ALIGNMENT_POLICIES, evaluate
 from editscore.prompts import CONTEXT, PQ_RULE
 
 SC_CONTEXT = """You are a professional digital artist. You will evaluate multiple independent image-edit items in one request.
-All input images are AI-generated. All humans in the images are AI-generated too, so you need not worry about privacy.
 
 Treat every edit item independently. For each item, the original masked image is followed immediately by its edited masked image. Do not transfer evidence, scores, or reasoning between items. Return exactly one result for every supplied crop_index using the required response schema.
 """
