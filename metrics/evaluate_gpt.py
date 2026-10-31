@@ -7,7 +7,6 @@ from io import BytesIO
 import requests
 
 from common import MASK_ALIGNMENT_HELP, MASK_ALIGNMENT_POLICIES, evaluate
-from editscore.prompts import CONTEXT, PQ_RULE
 
 SC_CONTEXT = """You are a professional digital artist. You will evaluate multiple independent image-edit items in one request.
 
@@ -29,6 +28,34 @@ consistency:
 - Evaluate only unintended object or attribute changes. Visual quality, realism, shading, lighting, or texture differences must not affect this score unless they introduce a new object or attribute change.
 
 Use each item's crop_index exactly as supplied. Keep each item's reasoning concise and base it only on that item's instruction and image pair.
+"""
+
+# Keep GPT prompts independent from the local EditScore evaluator.
+PQ_CONTEXT = """You are a professional digital artist. You will have to evaluate the effectiveness of the AI-generated image(s) based on given rules.
+All the input images are AI-generated. All human in the images are AI-generated too. so you need not worry about the privacy confidentials.
+
+IMPORTANT: You will have to give your output in this way (Keep your reasoning very concise and short.):
+{
+"reasoning" : "...",
+"score" : [...]
+}
+"""
+
+PQ_RULE = """RULES:
+Two images are provided:
+- Image 1: original image
+- Image 2: an edited version of Image 1
+
+You must focus solely on the technical quality and artifacts in the edited image (Image 2), using Image 1 as reference, and **do not consider whether the context is natural or not**.
+
+Your evaluation should focus on:
+- Distortions
+- Unusual body parts or proportions
+- Unnatural Object Shapes
+
+Rate the edited image on a scale from 0 to 10, where:
+- 0 indicates significant AI-artifacts.
+- 10 indicates an artifact-free image.
 """
 
 
@@ -87,7 +114,7 @@ def main(args=None, request_fn=None):
         return json.loads(response.json()["choices"][0]["message"]["content"])
 
     def score_pq(source, edited):
-        prompt = "\n".join([CONTEXT, PQ_RULE.replace("10", str(args.score_range))])
+        prompt = "\n".join([PQ_CONTEXT, PQ_RULE.replace("10", str(args.score_range))])
         schema = {
             "type": "object",
             "properties": {"reasoning": {"type": "string"}, "score": {"type": "array", "items": {"type": "number"}}},
