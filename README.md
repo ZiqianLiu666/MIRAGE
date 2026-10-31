@@ -10,7 +10,7 @@
 **Fig. 1: Example images and instructions involving multiple similar instances and compositional edits.** Such scenarios are challenging for state-of-the-art models, which often introduce unintended modifications. In contrast, MIRAGE achieves precise instance-level editing while preserving background consistency.
 
 # Benchmark Access
-We release **MIRA-Bench**, which can be downloaded on [Huggingface](https://huggingface.co/datasets/ziqiangoodgood/MIRAGE) or [Google Drive](https://drive.google.com/file/d/14uIOvaf7bi4PTc1PRRbbyYRuwbBkPmUc/view?usp=sharing) directly. The benchmark contains 200 samples from real world, each consisting of an image, a composite editing instruction formed by combining five sub-instructions, and the corresponding ground-truth mask. This benchmark is designed to evaluate image editing models in more complex referring-expression scenarios. 
+We release **MIRA-Bench**, which can be downloaded on [Huggingface](https://huggingface.co/datasets/ziqiangoodgood/MIRAGE) directly. The benchmark contains 200 samples from real world, each consisting of an image, a composite editing instruction formed by combining five sub-instructions, and the corresponding ground-truth mask. This benchmark is designed to evaluate image editing models in more complex referring-expression scenarios. 
 
 ![benchmark](jpg/benchmark_example.png)
 **Fig. 2: MIRA-Bench sample examples.** Easy (top) and hard (bottom) examples containing 3, 4, and 5 similar instances. And the different colors in the instructions correspond to the editing sections in the diagram.
