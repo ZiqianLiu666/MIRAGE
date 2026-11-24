@@ -18,8 +18,6 @@ We release **MIRA-Bench**, a benchmark designed to evaluate image editing models
 - **[MIRA-Bench-1.0](https://huggingface.co/datasets/ziqiangoodgood/MIRA-Bench-v1.0):** The original benchmark containing 100 synthetic images, described in [arXiv v1](https://arxiv.org/abs/2604.05180v1).
 - **[MIRA-Bench-1.1](https://huggingface.co/datasets/ziqiangoodgood/MIRA-Bench-v1.1):** The updated benchmark containing 200 real-world images, described in [arXiv v2](https://arxiv.org/abs/2604.05180v2).
 
-Both versions remain publicly available for reproducibility.
-
 ![benchmark](jpg/benchmark_example.png)
 **Fig. 2: MIRA-Bench sample examples.** Easy (top) and hard (bottom) examples containing 3, 4, and 5 similar instances. The colors in the instructions correspond to the respective editing regions.
 
