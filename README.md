@@ -10,11 +10,18 @@
 **Fig. 1: Example images and instructions involving multiple similar instances and compositional edits.** Such scenarios are challenging for state-of-the-art models, which often introduce unintended modifications. In contrast, MIRAGE achieves precise instance-level editing while preserving background consistency.
 
 # Benchmark Access
-We release **MIRA-Bench**, which can be downloaded on [MIRA-Bench-v1.0 (100 synthetic images)](https://huggingface.co/datasets/ziqiangoodgood/MIRA-Bench-v1.0) or [MIRA-Bench-v1.1 (200 real images)](https://huggingface.co/datasets/ziqiangoodgood/MIRA-Bench-v1.1)directly. Each consisting of an image, a composite editing instruction formed by combining five sub-instructions, and the corresponding ground-truth mask. This benchmark is designed to evaluate image editing models in more complex referring-expression scenarios. 
+
+We release **MIRA-Bench**, a benchmark designed to evaluate image editing models in complex multi-instance scenarios involving referring expressions. Each sample consists of an image, a composite editing instruction combining five sub-instructions, and corresponding ground-truth masks.
+
+### Benchmark Versions
+
+- **[MIRA-Bench-1.0](https://huggingface.co/datasets/ziqiangoodgood/MIRA-Bench-v1.0):** The original benchmark containing 100 synthetic images, described in [arXiv v1](https://arxiv.org/abs/2604.05180v1).
+- **[MIRA-Bench-1.1](https://huggingface.co/datasets/ziqiangoodgood/MIRA-Bench-v1.1):** The updated benchmark containing 200 real-world images, described in [arXiv v2](https://arxiv.org/abs/2604.05180v2).
+
+Both versions remain publicly available for reproducibility.
 
 ![benchmark](jpg/benchmark_example.png)
-**Fig. 2: MIRA-Bench sample examples.** Easy (top) and hard (bottom) examples containing 3, 4, and 5 similar instances. And the different colors in the instructions correspond to the editing sections in the diagram.
-
+**Fig. 2: MIRA-Bench sample examples.** Easy (top) and hard (bottom) examples containing 3, 4, and 5 similar instances. The colors in the instructions correspond to the respective editing regions.
 
 # 1. Requirements
 Install the required dependencies:
